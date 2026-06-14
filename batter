@@ -1,8 +1,7 @@
 """
-IPL CRICKET BOWLER ANALYTICS SYSTEM
+IPL CRICKET PLAYER ANALYTICS SYSTEM
 Senior Sports Data Scientist & Python Developer
 Complete implementation with ML clustering, KNN similarity, and visualizations
-FOCUSED ON BOWLING ANALYSIS
 """
 
 import pandas as pd
@@ -32,9 +31,9 @@ plt.rcParams['font.size'] = 12
 plt.rcParams['axes.facecolor'] = '#1e1e1e'
 plt.rcParams['figure.facecolor'] = '#1e1e1e'
 
-class BowlerAnalyticsSystem:
+class CricketAnalyticsSystem:
     """
-    Main Analytics System for IPL Bowler Analysis
+    Main Analytics System for IPL Cricket Player Analysis
     """
     
     def __init__(self, ball_by_ball_file=None, player_file=None):
@@ -46,130 +45,194 @@ class BowlerAnalyticsSystem:
         player_file: Path to player metadata CSV file
         """
         print("="*60)
-        print("IPL BOWLER ANALYTICS SYSTEM".center(60))
+        print("IPL CRICKET ANALYTICS SYSTEM".center(60))
         print("Loading Data...".center(60))
         print("="*60)
         
-        # Default file paths
+        # Default file paths - use the provided CSV files
         if ball_by_ball_file is None:
-            ball_by_ball_file = r"C:\Users\Aparajitha.S\OneDrive\Desktop\college\ml project\IPL_ball_by_ball_upda.csv"
+            ball_by_ball_file = r"IPL_ball_by_ball_upda.csv"
         if player_file is None:
-            player_file = r"C:\Users\Aparajitha.S\OneDrive\Desktop\college\ml project\players-data-updated.csv"
+            player_file = r"players-data-updated.csv"
             
         self.load_data(ball_by_ball_file, player_file)
         self.league_averages = {}
         self.calculate_league_averages()
         
         # Create player info mapping for quick lookup
-        self.create_bowler_info_mapping()
+        self.create_player_info_mapping()
         
-    def create_bowler_info_mapping(self):
-        """Create mapping from bowler names to their bowling styles"""
-        self.bowler_info_map = {}
+    def classify_bowler_type(self, bowl_style):
+        """Classify bowler type based on bowling style string"""
+        if pd.isna(bowl_style) or bowl_style == 'Unknown' or bowl_style == 'None':
+            return None
         
-        # Manual mapping for common bowlers (fallback if CSV doesn't have them)
+        bowl_style_lower = str(bowl_style).lower()
+        
+        # Check for Left Arm Pace first
+        if 'left arm fast' in bowl_style_lower or 'left arm medium' in bowl_style_lower or 'left arm fast medium' in bowl_style_lower:
+            return 'Left Arm Pace'
+        
+        # Check for Right Arm Pace
+        if 'right arm fast' in bowl_style_lower or 'right arm medium' in bowl_style_lower or 'right arm fast medium' in bowl_style_lower:
+            return 'Right Arm Pace'
+        
+        # Check for Left Arm Spin
+        if 'left arm offbreak' in bowl_style_lower or 'left arm orthodox' in bowl_style_lower or 'left arm wrist spin' in bowl_style_lower or 'slow left arm' in bowl_style_lower:
+            return 'Left Arm Spin'
+        
+        # Check for Right Arm Spin
+        if 'right arm offbreak' in bowl_style_lower or 'legbreak' in bowl_style_lower or 'right arm wrist spin' in bowl_style_lower or 'leg break' in bowl_style_lower:
+            return 'Right Arm Spin'
+        
+        return None
+        
+    def create_player_info_mapping(self):
+        """Create mapping from player names to their batting/bowling styles"""
+        self.player_info_map = {}
+        self.bowler_style_map = {}  # Initialize here
+        
+        # Enhanced manual mapping with proper bowler classifications
         manual_mapping = {
-            'Rashid Khan': {'bowl': 'Right Arm Leg Spin', 'type': 'Leg Spinner', 'pace': 'Spin'},
-            'Jasprit Bumrah': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'JJ Bumrah': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'Bhuvneshwar Kumar': {'bowl': 'Right Arm Medium', 'type': 'Medium Pacer', 'pace': 'Pace'},
-            'B Kumar': {'bowl': 'Right Arm Medium', 'type': 'Medium Pacer', 'pace': 'Pace'},
-            'Mohammed Shami': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'Trent Boult': {'bowl': 'Left Arm Fast Medium', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'Kagiso Rabada': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'Pat Cummins': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'PJ Cummins': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'Yuzvendra Chahal': {'bowl': 'Leg Break', 'type': 'Leg Spinner', 'pace': 'Spin'},
-            'YS Chahal': {'bowl': 'Leg Break', 'type': 'Leg Spinner', 'pace': 'Spin'},
-            'Ravichandran Ashwin': {'bowl': 'Right Arm Off Break', 'type': 'Off Spinner', 'pace': 'Spin'},
-            'R Ashwin': {'bowl': 'Right Arm Off Break', 'type': 'Off Spinner', 'pace': 'Spin'},
-            'Kuldeep Yadav': {'bowl': 'Left Arm Wrist Spin', 'type': 'Chinaman', 'pace': 'Spin'},
-            'Deepak Chahar': {'bowl': 'Right Arm Medium', 'type': 'Medium Pacer', 'pace': 'Pace'},
-            'DL Chahar': {'bowl': 'Right Arm Medium', 'type': 'Medium Pacer', 'pace': 'Pace'},
-            'Harshal Patel': {'bowl': 'Right Arm Medium', 'type': 'Medium Pacer', 'pace': 'Pace'},
-            'HV Patel': {'bowl': 'Right Arm Medium', 'type': 'Medium Pacer', 'pace': 'Pace'},
-            'Sunil Narine': {'bowl': 'Right Arm Off Break', 'type': 'Off Spinner', 'pace': 'Spin'},
-            'SP Narine': {'bowl': 'Right Arm Off Break', 'type': 'Off Spinner', 'pace': 'Spin'},
-            'Andre Russell': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'AD Russell': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'Dwayne Bravo': {'bowl': 'Right Arm Medium', 'type': 'Medium Pacer', 'pace': 'Pace'},
-            'DJ Bravo': {'bowl': 'Right Arm Medium', 'type': 'Medium Pacer', 'pace': 'Pace'},
-            'Lasith Malinga': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'SL Malinga': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'Jofra Archer': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'JC Archer': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'Anrich Nortje': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'A Nortje': {'bowl': 'Right Arm Fast', 'type': 'Fast Bowler', 'pace': 'Pace'},
-            'Rahul Tewatia': {'bowl': 'Leg Break', 'type': 'Leg Spinner', 'pace': 'Spin'},
-            'R Tewatia': {'bowl': 'Leg Break', 'type': 'Leg Spinner', 'pace': 'Spin'},
-            'Shakib Al Hasan': {'bowl': 'Slow Left Arm Orthodox', 'type': 'Left Arm Spinner', 'pace': 'Spin'},
-            'Axar Patel': {'bowl': 'Slow Left Arm Orthodox', 'type': 'Left Arm Spinner', 'pace': 'Spin'},
-            'AR Patel': {'bowl': 'Slow Left Arm Orthodox', 'type': 'Left Arm Spinner', 'pace': 'Spin'},
-            'Ravindra Jadeja': {'bowl': 'Slow Left Arm Orthodox', 'type': 'Left Arm Spinner', 'pace': 'Spin'},
-            'RA Jadeja': {'bowl': 'Slow Left Arm Orthodox', 'type': 'Left Arm Spinner', 'pace': 'Spin'},
+            # Right Arm Pace Bowlers
+            'P Kumar': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'Z Khan': {'bat': 'Right Hand Bat', 'bowl': 'Left Arm Fast Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Left Arm Pace'},
+            'AA Noffke': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'I Sharma': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'AB Dinda': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Medium Fast', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'B Lee': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'S Sreesanth': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'IK Pathan': {'bat': 'Left Hand Bat', 'bowl': 'Left Arm Medium Fast', 'role': 'All-Rounder', 'position': 'Lower Order', 'bowl_type': 'Left Arm Pace'},
+            'JH Kallis': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast Medium', 'role': 'All-Rounder', 'position': 'Top Order', 'bowl_type': 'Right Arm Pace'},
+            'AB Agarkar': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'CRD Fernando': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'DS Kulkarni': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'RP Singh': {'bat': 'Right Hand Bat', 'bowl': 'Left Arm Fast Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Left Arm Pace'},
+            'WPUJC Vaas': {'bat': 'Left Hand Bat', 'bowl': 'Left Arm Fast Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Left Arm Pace'},
+            'SM Pollock': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast Medium', 'role': 'All-Rounder', 'position': 'Lower Order', 'bowl_type': 'Right Arm Pace'},
+            'A Nehra': {'bat': 'Right Hand Bat', 'bowl': 'Left Arm Medium Fast', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Left Arm Pace'},
+            'JJ Bumrah': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'UT Yadav': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'Mohammed Shami': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'B Kumar': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'MA Starc': {'bat': 'Left Hand Bat', 'bowl': 'Left Arm Fast', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Left Arm Pace'},
+            'TA Boult': {'bat': 'Right Hand Bat', 'bowl': 'Left Arm Fast Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Left Arm Pace'},
+            'Sohail Tanvir': {'bat': 'Left Hand Bat', 'bowl': 'Left Arm Medium Fast', 'role': 'All-Rounder', 'position': 'Lower Order', 'bowl_type': 'Left Arm Pace'},
+            'Umar Gul': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'M Ntini': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'GD McGrath': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'Mohammad Asif': {'bat': 'Left Hand Bat', 'bowl': 'Right Arm Fast Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'PJ Sangwan': {'bat': 'Right Hand Bat', 'bowl': 'Left Arm Medium', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Left Arm Pace'},
+            'VRV Singh': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Medium Fast', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'MM Patel': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Medium Fast', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Pace'},
+            'SR Watson': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Fast Medium', 'role': 'All-Rounder', 'position': 'Top Order', 'bowl_type': 'Right Arm Pace'},
+            'DJ Bravo': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Medium', 'role': 'All-Rounder', 'position': 'Lower Order', 'bowl_type': 'Right Arm Pace'},
+            
+            # Right Arm Spin Bowlers
+            'SB Joshi': {'bat': 'Left Hand Bat', 'bowl': 'Slow Left Arm Orthodox', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Left Arm Spin'},
+            'Harbhajan Singh': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Off Break', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Spin'},
+            'M Muralitharan': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Off Break', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Spin'},
+            'R Ashwin': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Off Break', 'role': 'All-Rounder', 'position': 'Lower Order', 'bowl_type': 'Right Arm Spin'},
+            'RA Jadeja': {'bat': 'Left Hand Bat', 'bowl': 'Slow Left Arm Orthodox', 'role': 'All-Rounder', 'position': 'Middle Order', 'bowl_type': 'Left Arm Spin'},
+            'Yuvraj Singh': {'bat': 'Left Hand Bat', 'bowl': 'Slow Left Arm Orthodox', 'role': 'All-Rounder', 'position': 'Middle Order', 'bowl_type': 'Left Arm Spin'},
+            'PP Chawla': {'bat': 'Left Hand Bat', 'bowl': 'Leg Break', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Spin'},
+            'A Mishra': {'bat': 'Right Hand Bat', 'bowl': 'Leg Break', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Spin'},
+            'YS Chahal': {'bat': 'Right Hand Bat', 'bowl': 'Leg Break Googly', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Spin'},
+            'Kuldeep Yadav': {'bat': 'Left Hand Bat', 'bowl': 'Left Arm Wrist Spin', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Left Arm Spin'},
+            'Rashid Khan': {'bat': 'Right Hand Bat', 'bowl': 'Leg Break Googly', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Spin'},
+            'Imran Tahir': {'bat': 'Right Hand Bat', 'bowl': 'Leg Break Googly', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Spin'},
+            'SK Warne': {'bat': 'Right Hand Bat', 'bowl': 'Leg Break Googly', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Spin'},
+            'M Kartik': {'bat': 'Left Hand Bat', 'bowl': 'Slow Left Arm Orthodox', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Left Arm Spin'},
+            'Shakib Al Hasan': {'bat': 'Left Hand Bat', 'bowl': 'Slow Left Arm Orthodox', 'role': 'All-Rounder', 'position': 'Top Order', 'bowl_type': 'Left Arm Spin'},
+            'Shahid Afridi': {'bat': 'Right Hand Bat', 'bowl': 'Leg Break Googly', 'role': 'All-Rounder', 'position': 'Lower Order', 'bowl_type': 'Right Arm Spin'},
+            'PP Ojha': {'bat': 'Left Hand Bat', 'bowl': 'Slow Left Arm Orthodox', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Left Arm Spin'},
+            'A Kumble': {'bat': 'Right Hand Bat', 'bowl': 'Leg Break Googly', 'role': 'Bowler', 'position': 'Tailender', 'bowl_type': 'Right Arm Spin'},
+            'SB Styris': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Medium', 'role': 'All-Rounder', 'position': 'Middle Order', 'bowl_type': 'Right Arm Pace'},
+            'JDP Oram': {'bat': 'Left Hand Bat', 'bowl': 'Right Arm Fast Medium', 'role': 'All-Rounder', 'position': 'Lower Order', 'bowl_type': 'Right Arm Pace'},
+            'CL White': {'bat': 'Right Hand Bat', 'bowl': 'Leg Break Googly', 'role': 'Batter', 'position': 'Middle Order', 'bowl_type': 'Right Arm Spin'},
+            'DJ Hussey': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Off Break', 'role': 'Batter', 'position': 'Middle Order', 'bowl_type': 'Right Arm Spin'},
+            
+            # Batters (for info only)
+            'V Kohli': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Medium', 'role': 'Top Order Batter', 'position': 'Opener/Top Order', 'bowl_type': None},
+            'Virat Kohli': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Medium', 'role': 'Top Order Batter', 'position': 'Opener/Top Order', 'bowl_type': None},
+            'RG Sharma': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Off Break', 'role': 'Top Order Batter', 'position': 'Opener', 'bowl_type': None},
+            'Rohit Sharma': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Off Break', 'role': 'Top Order Batter', 'position': 'Opener', 'bowl_type': None},
+            'MS Dhoni': {'bat': 'Right Hand Bat', 'bowl': 'None', 'role': 'Wicketkeeper Batter', 'position': 'Finisher', 'bowl_type': None},
+            'KL Rahul': {'bat': 'Right Hand Bat', 'bowl': 'None', 'role': 'Wicketkeeper Batter', 'position': 'Opener', 'bowl_type': None},
+            'SK Raina': {'bat': 'Left Hand Bat', 'bowl': 'Right Arm Off Break', 'role': 'Top Order Batter', 'position': 'Top Order', 'bowl_type': None},
+            'DA Warner': {'bat': 'Left Hand Bat', 'bowl': 'Right Arm Leg Spin', 'role': 'Top Order Batter', 'position': 'Opener', 'bowl_type': None},
+            'David Warner': {'bat': 'Left Hand Bat', 'bowl': 'Right Arm Leg Spin', 'role': 'Top Order Batter', 'position': 'Opener', 'bowl_type': None},
+            'JC Buttler': {'bat': 'Right Hand Bat', 'bowl': 'None', 'role': 'Wicketkeeper Batter', 'position': 'Opener', 'bowl_type': None},
+            'Jos Buttler': {'bat': 'Right Hand Bat', 'bowl': 'None', 'role': 'Wicketkeeper Batter', 'position': 'Opener', 'bowl_type': None},
+            'AB de Villiers': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Medium', 'role': 'Wicketkeeper Batter', 'position': 'Finisher', 'bowl_type': None},
+            'G Gambhir': {'bat': 'Left Hand Bat', 'bowl': 'Leg Break', 'role': 'Top Order Batter', 'position': 'Opener', 'bowl_type': None},
+            'Gautam Gambhir': {'bat': 'Left Hand Bat', 'bowl': 'Leg Break', 'role': 'Top Order Batter', 'position': 'Opener', 'bowl_type': None},
+            'SC Ganguly': {'bat': 'Left Hand Bat', 'bowl': 'Right Arm Medium', 'role': 'Top Order Batter', 'position': 'Opener', 'bowl_type': None},
+            'R Dravid': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Off Break', 'role': 'Top Order Batter', 'position': 'Top Order', 'bowl_type': None},
+            'V Sehwag': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Off Break', 'role': 'Top Order Batter', 'position': 'Opener', 'bowl_type': None},
+            'BB McCullum': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Off Break', 'role': 'Wicketkeeper Batter', 'position': 'Opener', 'bowl_type': None},
+            'ML Hayden': {'bat': 'Left Hand Bat', 'bowl': 'Right Arm Medium', 'role': 'Top Order Batter', 'position': 'Opener', 'bowl_type': None},
+            'AC Gilchrist': {'bat': 'Left Hand Bat', 'bowl': 'Right Arm Off Break', 'role': 'Wicketkeeper Batter', 'position': 'Opener', 'bowl_type': None},
+            'CH Gayle': {'bat': 'Left Hand Bat', 'bowl': 'Right Arm Off Break', 'role': 'Top Order Batter', 'position': 'Opener', 'bowl_type': None},
+            'KP Pietersen': {'bat': 'Right Hand Bat', 'bowl': 'Right Arm Off Break', 'role': 'Top Order Batter', 'position': 'Top Order', 'bowl_type': None},
         }
         
-        # First, load from player data file
-        for _, row in self.player_data.iterrows():
-            player_name = row.get('player_name', '')
-            if pd.notna(player_name):
-                bowl_style = row.get('bowl_style', 'Unknown') if pd.notna(row.get('bowl_style', 'Unknown')) else 'Unknown'
-                self.bowler_info_map[player_name] = {
-                    'bowl': bowl_style,
-                    'type': self.classify_bowler_type(bowl_style),
-                    'pace': 'Pace' if any(x in str(bowl_style).lower() for x in ['fast', 'medium']) else 'Spin' if any(x in str(bowl_style).lower() for x in ['spin', 'leg', 'off']) else 'Unknown'
-                }
+        # First, load from player data file if available
+        if hasattr(self, 'player_data') and self.player_data is not None and len(self.player_data) > 0:
+            for _, row in self.player_data.iterrows():
+                player_name = row.get('player_name', '')
+                if pd.notna(player_name):
+                    bowl_style = row.get('bowl_style', 'Unknown') if pd.notna(row.get('bowl_style', 'Unknown')) else 'Unknown'
+                    bowl_type = self.classify_bowler_type(bowl_style)
+                    
+                    self.player_info_map[player_name] = {
+                        'bat': row.get('bat_style', 'Unknown') if pd.notna(row.get('bat_style', 'Unknown')) else 'Unknown',
+                        'bowl': bowl_style,
+                        'role': row.get('playing_role', 'Unknown') if pd.notna(row.get('playing_role', 'Unknown')) else 'Unknown',
+                        'position': 'Unknown',
+                        'bowl_type': bowl_type
+                    }
         
         # Then, update with manual mapping for any missing players
         for player_name, info in manual_mapping.items():
-            if player_name not in self.bowler_info_map:
-                self.bowler_info_map[player_name] = info
+            if player_name not in self.player_info_map:
+                self.player_info_map[player_name] = info
             else:
                 # Update if existing has Unknown values
-                if self.bowler_info_map[player_name]['bowl'] == 'Unknown' and info['bowl'] != 'Unknown':
-                    self.bowler_info_map[player_name]['bowl'] = info['bowl']
-                if self.bowler_info_map[player_name]['type'] == 'Unknown' and info['type'] != 'Unknown':
-                    self.bowler_info_map[player_name]['type'] = info['type']
+                if self.player_info_map[player_name]['bat'] == 'Unknown' and info.get('bat', 'Unknown') != 'Unknown':
+                    self.player_info_map[player_name]['bat'] = info['bat']
+                if self.player_info_map[player_name]['bowl'] == 'Unknown' and info.get('bowl', 'Unknown') != 'Unknown':
+                    self.player_info_map[player_name]['bowl'] = info['bowl']
+                if self.player_info_map[player_name]['role'] == 'Unknown' and info.get('role', 'Unknown') != 'Unknown':
+                    self.player_info_map[player_name]['role'] = info['role']
+                if self.player_info_map[player_name].get('position', 'Unknown') == 'Unknown' and info.get('position', 'Unknown') != 'Unknown':
+                    self.player_info_map[player_name]['position'] = info['position']
+                if info.get('bowl_type') is not None and self.player_info_map[player_name].get('bowl_type') is None:
+                    self.player_info_map[player_name]['bowl_type'] = info['bowl_type']
         
-        # Create batter type mapping for vulnerability analysis
-        self.batter_type_map = {}
-        batter_manual = {
-            'V Kohli': 'Right Hand Bat', 'Virat Kohli': 'Right Hand Bat',
-            'RG Sharma': 'Right Hand Bat', 'Rohit Sharma': 'Right Hand Bat',
-            'DA Warner': 'Left Hand Bat', 'David Warner': 'Left Hand Bat',
-            'KL Rahul': 'Right Hand Bat', 'MS Dhoni': 'Right Hand Bat',
-            'SA Yadav': 'Right Hand Bat', 'Suryakumar Yadav': 'Right Hand Bat',
-            'Ishan Kishan': 'Left Hand Bat', 'RR Pant': 'Left Hand Bat',
-            'SK Raina': 'Left Hand Bat', 'SS Iyer': 'Right Hand Bat',
-            'Shubman Gill': 'Right Hand Bat', 'JC Buttler': 'Right Hand Bat',
-            'Q de Kock': 'Left Hand Bat', 'AB de Villiers': 'Right Hand Bat',
-            'F du Plessis': 'Right Hand Bat', 'SV Samson': 'Right Hand Bat',
-            'Tilak Varma': 'Left Hand Bat', 'N Rana': 'Left Hand Bat',
-        }
+        # Create bowling style mapping for vulnerability analysis
+        self.bowler_style_map = {}
+        for player_name, info in self.player_info_map.items():
+            bowl_type = info.get('bowl_type')
+            if bowl_type and bowl_type in ['Right Arm Pace', 'Left Arm Pace', 'Right Arm Spin', 'Left Arm Spin']:
+                self.bowler_style_map[player_name] = bowl_type
         
-        for batter, style in batter_manual.items():
-            self.batter_type_map[batter] = style
+        # Also extract bowlers from ball data
+        if hasattr(self, 'ball_data') and self.ball_data is not None:
+            bowlers = self.ball_data['bowler'].unique()
+            for bowler in bowlers:
+                if bowler not in self.bowler_style_map and pd.notna(bowler):
+                    # Try to classify based on name patterns
+                    if any(x in str(bowler).lower() for x in ['kumar', 'sharma', 'singh', 'pathan', 'khan']):
+                        # Default classification for common Indian pacers
+                        self.bowler_style_map[bowler] = 'Right Arm Pace'
         
-        print(f"✓ Created bowler info mapping for {len(self.bowler_info_map)} bowlers")
-        
-    def classify_bowler_type(self, bowl_style):
-        """Classify bowler type based on bowling style"""
-        bowl_style_lower = str(bowl_style).lower()
-        
-        if 'leg' in bowl_style_lower or 'wrist' in bowl_style_lower:
-            if 'left' in bowl_style_lower:
-                return 'Chinaman'
-            return 'Leg Spinner'
-        elif 'off' in bowl_style_lower:
-            return 'Off Spinner'
-        elif 'orthodox' in bowl_style_lower or 'left arm' in bowl_style_lower:
-            return 'Left Arm Spinner'
-        elif 'fast' in bowl_style_lower:
-            return 'Fast Bowler'
-        elif 'medium' in bowl_style_lower:
-            return 'Medium Pacer'
-        else:
-            return 'Unknown'
+        print(f"✓ Created player info mapping for {len(self.player_info_map)} players")
+        print(f"✓ Created bowling style mapping for {len(self.bowler_style_map)} bowlers")
+        print(f"  - Right Arm Pace: {sum(1 for t in self.bowler_style_map.values() if t == 'Right Arm Pace')}")
+        print(f"  - Left Arm Pace: {sum(1 for t in self.bowler_style_map.values() if t == 'Left Arm Pace')}")
+        print(f"  - Right Arm Spin: {sum(1 for t in self.bowler_style_map.values() if t == 'Right Arm Spin')}")
+        print(f"  - Left Arm Spin: {sum(1 for t in self.bowler_style_map.values() if t == 'Left Arm Spin')}")
         
     def load_data(self, ball_by_ball_file, player_file):
         """Load and prepare datasets"""
@@ -184,12 +247,13 @@ class BowlerAnalyticsSystem:
                 print(f"✓ Loaded {len(self.player_data)} player records")
                 
                 # Clean player data
-                self.player_data['bowl_style'] = self.player_data['bowl_style'].fillna('Unknown')
                 self.player_data['bat_style'] = self.player_data['bat_style'].fillna('Unknown')
+                self.player_data['bowl_style'] = self.player_data['bowl_style'].fillna('Unknown')
+                self.player_data['playing_role'] = self.player_data['playing_role'].fillna('Unknown')
                 
             except Exception as e:
                 print(f"⚠ Player metadata file error: {e}")
-                self.player_data = pd.DataFrame(columns=['player_name', 'bat_style', 'bowl_style'])
+                self.player_data = pd.DataFrame(columns=['player_name', 'bat_style', 'bowl_style', 'playing_role'])
             
             # Prepare data for analysis
             self.prepare_data()
@@ -201,37 +265,30 @@ class BowlerAnalyticsSystem:
             
     def prepare_data(self):
         """Prepare and clean datasets for analysis"""
-        # Filter only bowling data
-        self.bowling_data = self.ball_data[self.ball_data['bowler'].notna()].copy()
+        # Filter only batting data (balls where striker faced)
+        self.batting_data = self.ball_data[self.ball_data['runs_off_bat'].notna()].copy()
         
         # Convert ball column to numeric (handle decimal overs)
-        if 'ball' in self.bowling_data.columns:
+        if 'ball' in self.batting_data.columns:
             # Convert ball to numeric (e.g., 1.1 -> 1.1, but we need over number)
-            self.bowling_data['over_number'] = self.bowling_data['ball'].astype(float)
+            self.batting_data['over_number'] = self.batting_data['ball'].astype(float)
             # Extract over number (integer part)
-            self.bowling_data['over'] = self.bowling_data['over_number'].astype(int)
+            self.batting_data['over'] = self.batting_data['over_number'].astype(int)
             # Calculate ball number within over
-            self.bowling_data['ball_number'] = ((self.bowling_data['over_number'] - self.bowling_data['over']) * 10).round().astype(int)
+            self.batting_data['ball_number'] = ((self.batting_data['over_number'] - self.batting_data['over']) * 10).round().astype(int)
             # Calculate total ball position (1-120 for 20 overs)
-            self.bowling_data['ball_position'] = (self.bowling_data['over'] - 1) * 6 + self.bowling_data['ball_number']
+            self.batting_data['ball_position'] = (self.batting_data['over'] - 1) * 6 + self.batting_data['ball_number']
         
-        print(f"✓ Prepared data: {len(self.bowling_data)} bowling records")
+        print(f"✓ Prepared data: {len(self.batting_data)} batting records")
         
     def create_sample_data(self):
         """Create sample IPL data if real data not available"""
         np.random.seed(42)
         
-        # Sample bowlers with realistic stats
-        bowlers = [
-            'Jasprit Bumrah', 'Rashid Khan', 'Kagiso Rabada', 'Bhuvneshwar Kumar',
-            'Trent Boult', 'Yuzvendra Chahal', 'Mohammed Shami', 'Pat Cummins',
-            'Ravichandran Ashwin', 'Kuldeep Yadav', 'Deepak Chahar', 'Harshal Patel'
-        ]
-        
-        # Sample batters
-        batters = [
-            'Virat Kohli', 'Rohit Sharma', 'KL Rahul', 'David Warner', 'MS Dhoni',
-            'Suryakumar Yadav', 'Ishan Kishan', 'Hardik Pandya', 'AB de Villiers'
+        # Sample players with realistic stats
+        players = [
+            'Virat Kohli', 'Rohit Sharma', 'KL Rahul', 'MS Dhoni', 'Hardik Pandya',
+            'Jasprit Bumrah', 'Rashid Khan', 'Andre Russell', 'David Warner', 'Kane Williamson'
         ]
         
         # Create ball-by-ball data
@@ -240,110 +297,113 @@ class BowlerAnalyticsSystem:
             for innings in [1, 2]:
                 for over in range(1, 21):
                     for ball in range(1, 7):
-                        bowler = np.random.choice(bowlers)
-                        striker = np.random.choice(batters)
+                        striker = np.random.choice(players)
+                        bowler = np.random.choice(players)
                         runs = np.random.choice([0,1,2,3,4,6], p=[0.35,0.25,0.15,0.05,0.12,0.08])
-                        is_wicket = np.random.random() < 0.05
-                        
                         ball_records.append({
                             'match_id': match_id,
                             'innings': innings,
                             'over': over,
                             'ball_number': ball,
                             'ball': over + (ball/10),
-                            'bowler': bowler,
                             'striker': striker,
+                            'bowler': bowler,
                             'runs_off_bat': runs,
-                            'player_dismissed': striker if is_wicket else '',
-                            'wicket_type': 'caught' if is_wicket else '',
+                            'player_dismissed': striker if np.random.random() < 0.05 else '',
                             'venue': np.random.choice(['Wankhede', 'Eden Gardens', 'Chinnaswamy', 'Chepauk']),
                             'extras': 0,
+                            'wicket_type': 'caught' if np.random.random() < 0.04 else '',
                             'batting_team': f'Team_{match_id%8+1}',
                             'bowling_team': f'Team_{(match_id+1)%8+1}',
                             'season': np.random.choice([2018,2019,2020,2021,2022,2023])
                         })
         
         self.ball_data = pd.DataFrame(ball_records)
-        self.bowling_data = self.ball_data.copy()
-        self.bowling_data['ball_position'] = (self.bowling_data['over'] - 1) * 6 + self.bowling_data['ball_number']
+        self.batting_data = self.ball_data.copy()
+        self.batting_data['ball_position'] = (self.batting_data['over'] - 1) * 6 + self.batting_data['ball_number']
         
         print("✓ Sample data created with realistic IPL simulation")
         
     def calculate_league_averages(self):
         """Calculate league averages for phase dominance scoring"""
         for phase, overs in [('Powerplay', (1,6)), ('Middle', (7,15)), ('Death', (16,20))]:
-            if 'ball_position' in self.bowling_data.columns:
-                phase_data = self.bowling_data[self.bowling_data['ball_position'].between((overs[0]-1)*6+1, overs[1]*6)]
+            if 'ball_position' in self.batting_data.columns:
+                phase_data = self.batting_data[self.batting_data['ball_position'].between((overs[0]-1)*6+1, overs[1]*6)]
             else:
-                phase_data = self.bowling_data[self.bowling_data['ball'].between(overs[0], overs[1])]
+                phase_data = self.batting_data[self.batting_data['ball'].between(overs[0], overs[1])]
                 
             if len(phase_data) > 0:
-                avg_economy = (phase_data['runs_off_bat'].sum() + phase_data['extras'].sum()) / (len(phase_data) / 6)
-                avg_wicket_rate = (phase_data['wicket_type'].notna().sum() / len(phase_data)) * 100
-                self.league_averages[phase] = {'economy': avg_economy, 'wicket_rate': avg_wicket_rate}
+                avg_sr = (phase_data['runs_off_bat'].sum() / len(phase_data)) * 100
+                self.league_averages[phase] = {'sr': avg_sr}
             else:
-                self.league_averages[phase] = {'economy': 0, 'wicket_rate': 0}
+                self.league_averages[phase] = {'sr': 0}
             
-    def get_bowler_stats(self, bowler_name):
-        """Get comprehensive stats for a bowler"""
-        # Filter balls bowled by the bowler
-        bowler_balls = self.bowling_data[self.bowling_data['bowler'] == bowler_name]
+    def get_player_stats(self, player_name):
+        """Get comprehensive stats for a player"""
+        # Filter balls faced by the player
+        player_balls = self.batting_data[self.batting_data['striker'] == player_name]
         
-        if len(bowler_balls) == 0:
+        if len(player_balls) == 0:
             return None
             
         # Basic stats
-        matches = bowler_balls['match_id'].nunique()
-        innings = bowler_balls.groupby(['match_id', 'innings']).ngroups
-        runs_conceded = bowler_balls['runs_off_bat'].sum() + bowler_balls['extras'].sum()
-        balls_bowled = len(bowler_balls)
-        overs = balls_bowled / 6
-        wickets = bowler_balls['wicket_type'].notna().sum()
+        matches = player_balls['match_id'].nunique()
+        innings = player_balls.groupby(['match_id', 'innings']).ngroups
+        runs = player_balls['runs_off_bat'].sum()
+        balls_faced = len(player_balls)
+        dismissals = len(player_balls[player_balls['player_dismissed'] == player_name])
         
-        economy = runs_conceded / overs if overs > 0 else 0
-        average = runs_conceded / wickets if wickets > 0 else 0
-        strike_rate = balls_bowled / wickets if wickets > 0 else 0
+        avg = runs / dismissals if dismissals > 0 else runs
+        sr = (runs / balls_faced) * 100 if balls_faced > 0 else 0
         
-        # Dot ball percentage
-        dot_balls = len(bowler_balls[bowler_balls['runs_off_bat'] == 0])
-        dot_percentage = (dot_balls / balls_bowled) * 100 if balls_bowled > 0 else 0
+        # Boundary % and Dot %
+        boundaries = player_balls[player_balls['runs_off_bat'].isin([4,6])]
+        boundary_pct = (len(boundaries) / balls_faced) * 100 if balls_faced > 0 else 0
+        dot_pct = (len(player_balls[player_balls['runs_off_bat'] == 0]) / balls_faced) * 100 if balls_faced > 0 else 0
         
-        # Boundary percentage
-        boundaries = bowler_balls[bowler_balls['runs_off_bat'].isin([4,6])]
-        boundary_percentage = (len(boundaries) / balls_bowled) * 100 if balls_bowled > 0 else 0
+        # 50s and 100s
+        innings_scores = player_balls.groupby(['match_id', 'innings'])['runs_off_bat'].sum()
+        fifties = len(innings_scores[(innings_scores >= 50) & (innings_scores < 100)])
+        hundreds = len(innings_scores[innings_scores >= 100])
         
-        # 4+ wicket hauls
-        match_wickets = bowler_balls[bowler_balls['wicket_type'].notna()].groupby('match_id').size()
-        four_wicket_hauls = len(match_wickets[match_wickets >= 4])
-        five_wicket_hauls = len(match_wickets[match_wickets >= 5])
+        # Calculate average batting position
+        # Approximate batting position based on over of first ball faced
+        first_ball_over = player_balls.groupby(['match_id', 'innings'])['over'].min().mean()
         
-        # Get bowler metadata from mapping
-        bowler_info = self.bowler_info_map.get(bowler_name, {})
-        bowl_style = bowler_info.get('bowl', 'Unknown')
-        bowler_type = bowler_info.get('type', 'Unknown')
+        # Get player metadata from mapping
+        player_info = self.player_info_map.get(player_name, {})
+        bat_style = player_info.get('bat', 'Unknown')
+        bowl_style = player_info.get('bowl', 'Unknown')
+        playing_role = player_info.get('role', 'Unknown')
+        batting_position = player_info.get('position', 'Unknown')
+        
+        # Get batter subtype
+        batter_subtype = self.batter_subtype_map.get(player_name, 'Standard Batter')
         
         return {
-            'name': bowler_name,
+            'name': player_name,
+            'bat_style': bat_style,
             'bowl_style': bowl_style,
-            'bowler_type': bowler_type,
+            'playing_role': playing_role,
+            'batting_position': batting_position,
+            'batter_subtype': batter_subtype,
+            'avg_position': round(first_ball_over, 1) if not np.isnan(first_ball_over) else 0,
             'matches': matches,
             'innings': innings,
-            'overs': round(overs, 1),
-            'balls': balls_bowled,
-            'runs': int(runs_conceded),
-            'wickets': wickets,
-            'economy': round(economy, 2),
-            'average': round(average, 2),
-            'strike_rate': round(strike_rate, 1),
-            'dot_percentage': round(dot_percentage, 2),
-            'boundary_percentage': round(boundary_percentage, 2),
-            'four_wicket_hauls': four_wicket_hauls,
-            'five_wicket_hauls': five_wicket_hauls
+            'runs': int(runs),
+            'balls_faced': int(balls_faced),
+            'average': round(avg, 2),
+            'strike_rate': round(sr, 2),
+            'boundary_pct': round(boundary_pct, 2),
+            'dot_pct': round(dot_pct, 2),
+            'fifties': fifties,
+            'hundreds': hundreds,
+            'dismissals': dismissals
         }
         
-    def calculate_best_bowling_phase(self, bowler_name):
-        """Calculate performance in different bowling phases"""
-        bowler_balls = self.bowling_data[self.bowling_data['bowler'] == bowler_name]
+    def calculate_best_batting_phase(self, player_name):
+        """Calculate performance in different batting phases"""
+        player_balls = self.batting_data[self.batting_data['striker'] == player_name]
         
         phases = {
             'Powerplay (1-6)': (1, 6),
@@ -352,325 +412,318 @@ class BowlerAnalyticsSystem:
         }
         
         phase_stats = {}
-        phase_economy = {}
+        phase_runs = {}
         
         for phase_name, (start, end) in phases.items():
-            if 'ball_position' in bowler_balls.columns:
-                phase_data = bowler_balls[bowler_balls['ball_position'].between((start-1)*6+1, end*6)]
+            if 'ball_position' in player_balls.columns:
+                phase_data = player_balls[player_balls['ball_position'].between((start-1)*6+1, end*6)]
             else:
-                phase_data = bowler_balls[bowler_balls['ball'].between(start, end)]
+                phase_data = player_balls[player_balls['ball'].between(start, end)]
                 
             if len(phase_data) > 0:
-                runs = phase_data['runs_off_bat'].sum() + phase_data['extras'].sum()
+                runs = phase_data['runs_off_bat'].sum()
                 balls = len(phase_data)
-                overs = balls / 6
-                wickets = phase_data['wicket_type'].notna().sum()
-                economy = runs / overs if overs > 0 else 0
-                dot_balls = (phase_data['runs_off_bat'] == 0).sum()
-                dot_pct = (dot_balls / balls) * 100 if balls > 0 else 0
+                dismissals = len(phase_data[phase_data['player_dismissed'] == player_name])
+                sr = (runs / balls) * 100 if balls > 0 else 0
+                avg = runs / dismissals if dismissals > 0 else runs
+                boundaries = len(phase_data[phase_data['runs_off_bat'].isin([4,6])])
+                dots = len(phase_data[phase_data['runs_off_bat'] == 0])
                 
                 phase_stats[phase_name] = {
                     'runs': int(runs),
                     'balls': int(balls),
-                    'overs': round(overs, 1),
-                    'wickets': wickets,
-                    'economy': round(economy, 2),
-                    'dot_pct': round(dot_pct, 2)
+                    'sr': round(sr, 2),
+                    'avg': round(avg, 2),
+                    'boundaries': boundaries,
+                    'dots': dots,
+                    'boundary_pct': round((boundaries / balls) * 100, 2) if balls > 0 else 0,
+                    'dot_pct': round((dots / balls) * 100, 2) if balls > 0 else 0
                 }
-                phase_economy[phase_name] = economy
+                phase_runs[phase_name] = runs
             else:
-                phase_stats[phase_name] = {'runs': 0, 'balls': 0, 'overs': 0, 'wickets': 0, 'economy': 0, 'dot_pct': 0}
-                phase_economy[phase_name] = 0
+                phase_stats[phase_name] = {'runs': 0, 'balls': 0, 'sr': 0, 'avg': 0, 'boundaries': 0, 'dots': 0, 'boundary_pct': 0, 'dot_pct': 0}
+                phase_runs[phase_name] = 0
                 
-        best_phase = min(phase_economy, key=phase_economy.get) if max(phase_economy.values()) > 0 else "N/A"
+        # BEST PHASE BASED ON RUNS SCORED (most runs in that phase)
+        best_phase = max(phase_runs, key=phase_runs.get) if max(phase_runs.values()) > 0 else "N/A"
         
         return phase_stats, best_phase
     
-    def calculate_phase_dominance_score(self, bowler_name):
+    def calculate_phase_dominance_score(self, player_name):
         """Calculate phase dominance compared to league averages"""
-        bowler_balls = self.bowling_data[self.bowling_data['bowler'] == bowler_name]
+        player_balls = self.batting_data[self.batting_data['striker'] == player_name]
         dominance_scores = {}
         
         phases = ['Powerplay', 'Middle', 'Death']
         phase_ranges = [(1,6), (7,15), (16,20)]
         
         for phase, (start, end) in zip(phases, phase_ranges):
-            if 'ball_position' in bowler_balls.columns:
-                bowler_phase = bowler_balls[bowler_balls['ball_position'].between((start-1)*6+1, end*6)]
+            if 'ball_position' in player_balls.columns:
+                player_phase = player_balls[player_balls['ball_position'].between((start-1)*6+1, end*6)]
             else:
-                bowler_phase = bowler_balls[bowler_balls['ball'].between(start, end)]
+                player_phase = player_balls[player_balls['ball'].between(start, end)]
                 
-            if len(bowler_phase) > 0:
-                bowler_economy = (bowler_phase['runs_off_bat'].sum() + bowler_phase['extras'].sum()) / (len(bowler_phase) / 6)
-                bowler_wicket_rate = (bowler_phase['wicket_type'].notna().sum() / len(bowler_phase)) * 100
-                
-                league_economy = self.league_averages.get(phase, {}).get('economy', 0)
-                league_wicket_rate = self.league_averages.get(phase, {}).get('wicket_rate', 0)
-                
-                if league_economy > 0:
-                    econ_dominance = (league_economy / bowler_economy) * 100 if bowler_economy > 0 else 0
+            if len(player_phase) > 0:
+                player_sr = (player_phase['runs_off_bat'].sum() / len(player_phase)) * 100
+                league_sr = self.league_averages.get(phase, {}).get('sr', 0)
+                if league_sr > 0:
+                    dominance = (player_sr / league_sr) * 100
+                    dominance_scores[phase] = round(dominance, 2)
                 else:
-                    econ_dominance = 0
-                    
-                if league_wicket_rate > 0:
-                    wicket_dominance = (bowler_wicket_rate / league_wicket_rate) * 100
-                else:
-                    wicket_dominance = 0
-                    
-                # Combined dominance score (lower economy is better, higher wicket rate is better)
-                dominance_scores[phase] = round((econ_dominance + wicket_dominance) / 2, 2)
+                    dominance_scores[phase] = 0
             else:
                 dominance_scores[phase] = 0
                 
         return dominance_scores
     
-    def calculate_pitch_intelligence(self, bowler_name):
-        """Calculate venue-based performance for bowler"""
-        bowler_balls = self.bowling_data[self.bowling_data['bowler'] == bowler_name]
+    def calculate_pitch_intelligence(self, player_name):
+        """Calculate venue-based performance - returns top 3 best and top 3 worst venues"""
+        player_balls = self.batting_data[self.batting_data['striker'] == player_name]
         
         venue_stats = {}
-        for venue in bowler_balls['venue'].unique():
-            venue_data = bowler_balls[bowler_balls['venue'] == venue]
-            if len(venue_data) >= 12:  # Minimum 2 overs threshold
-                runs = venue_data['runs_off_bat'].sum() + venue_data['extras'].sum()
+        for venue in player_balls['venue'].unique():
+            venue_data = player_balls[player_balls['venue'] == venue]
+            if len(venue_data) >= 5:  # Minimum balls threshold
+                runs = venue_data['runs_off_bat'].sum()
                 balls = len(venue_data)
-                overs = balls / 6
-                wickets = venue_data['wicket_type'].notna().sum()
-                economy = runs / overs if overs > 0 else 0
+                dismissals = len(venue_data[venue_data['player_dismissed'] == player_name])
+                avg = runs / dismissals if dismissals > 0 else runs
+                sr = (runs / balls) * 100 if balls > 0 else 0
+                boundaries = len(venue_data[venue_data['runs_off_bat'].isin([4,6])])
                 
                 venue_stats[venue] = {
                     'runs': int(runs),
-                    'overs': round(overs, 1),
-                    'wickets': wickets,
-                    'economy': round(economy, 2),
-                    'balls': int(balls)
+                    'avg': round(avg, 2),
+                    'sr': round(sr, 2),
+                    'balls': int(balls),
+                    'boundaries': boundaries,
+                    'matches': venue_data['match_id'].nunique()
                 }
         
         if venue_stats:
-            # Sort venues by economy and get best and worst
-            sorted_venues = sorted(venue_stats.items(), key=lambda x: x[1]['economy'])
-            best_venues = sorted_venues[:2] if len(sorted_venues) >= 2 else sorted_venues
-            worst_venues = sorted_venues[-2:] if len(sorted_venues) >= 2 else sorted_venues
+            # Sort venues by SR and get top 3 and bottom 3
+            sorted_venues = sorted(venue_stats.items(), key=lambda x: x[1]['sr'], reverse=True)
+            best_venues = sorted_venues[:3] if len(sorted_venues) >= 3 else sorted_venues
+            worst_venues = sorted_venues[-3:] if len(sorted_venues) >= 3 else sorted_venues
             
-            # Pitch Intelligence Score (normalized economy across venues)
-            avg_economy = np.mean([stats['economy'] for stats in venue_stats.values()])
-            pitch_score = max(0, min(100, (1 - (avg_economy - 7) / 5) * 100)) if avg_economy > 0 else 50
+            # Pitch Intelligence Score (normalized performance across venues)
+            avg_sr = np.mean([stats['sr'] for stats in venue_stats.values()])
+            pitch_score = min(100, max(0, (avg_sr / 140) * 100)) if avg_sr > 0 else 0
             
             return {
                 'best_venues': best_venues,
                 'worst_venues': worst_venues,
                 'pitch_score': round(pitch_score, 2),
-                'avg_economy': round(avg_economy, 2)
+                'avg_sr': round(avg_sr, 2),
+                'total_venues': len(venue_stats)
             }
         return None
     
-    def get_batter_hand(self, batter_name):
-        """Get batter's batting hand"""
-        # Check mapping first
-        if batter_name in self.batter_type_map:
-            return self.batter_type_map[batter_name]
+    def calculate_vulnerability_index(self, player_name):
+        """Calculate vulnerability against different bowler types - Enhanced with more metrics"""
+        player_balls = self.batting_data[self.batting_data['striker'] == player_name]
         
-        # Try to get from player data
-        player_info = self.player_data[self.player_data['player_name'] == batter_name]
-        if len(player_info) > 0:
-            bat_style = str(player_info.iloc[0].get('bat_style', ''))
-            if 'Left' in bat_style:
-                return 'Left Hand Bat'
-            elif 'Right' in bat_style:
-                return 'Right Hand Bat'
+        # Bowler type categories - all 4 types
+        bowler_types = ['Right Arm Pace', 'Left Arm Pace', 'Right Arm Spin', 'Left Arm Spin']
         
-        # Default based on name patterns
-        left_handers = ['Warner', 'Pant', 'Jadeja', 'Raina', 'Kishan', 'de Kock', 'Shakib']
-        for lh in left_handers:
-            if lh.lower() in batter_name.lower():
-                return 'Left Hand Bat'
-        return 'Right Hand Bat'  # Default assumption
-    
-    def calculate_batter_type_vulnerability(self, bowler_name):
-        """Calculate performance against different batter types"""
-        bowler_balls = self.bowling_data[self.bowling_data['bowler'] == bowler_name]
-        
-        batter_types = ['Right Hand Bat', 'Left Hand Bat']
+        # Initialize stats for each bowler type with default values
         type_stats = {}
+        for bowl_type in bowler_types:
+            type_stats[bowl_type] = {
+                'sr': 0, 'avg': 0, 'balls': 0, 'runs': 0, 'dismissals': 0, 
+                'vulnerability_score': 0, 'boundaries': 0, 'dots': 0,
+                'boundary_pct': 0, 'dot_pct': 0, 'runs_per_ball': 0
+            }
         
-        for batter_type in batter_types:
-            # Find batters of this type
-            batters_of_type = [b for b in bowler_balls['striker'].unique() if self.get_batter_hand(b) == batter_type]
+        # Find bowlers of each type from the mapping
+        for bowl_type in bowler_types:
+            bowlers_of_type = [b for b, t in self.bowler_style_map.items() if t == bowl_type]
             
-            type_data = bowler_balls[bowler_balls['striker'].isin(batters_of_type)]
+            if bowlers_of_type:
+                type_data = player_balls[player_balls['bowler'].isin(bowlers_of_type)]
+            else:
+                type_data = pd.DataFrame()
             
             if len(type_data) > 0:
-                runs = type_data['runs_off_bat'].sum() + type_data['extras'].sum()
+                runs = type_data['runs_off_bat'].sum()
                 balls = len(type_data)
-                overs = balls / 6
-                wickets = type_data['wicket_type'].notna().sum()
-                economy = runs / overs if overs > 0 else 0
-                avg = runs / wickets if wickets > 0 else 0
+                dismissals = len(type_data[type_data['player_dismissed'] == player_name])
+                boundaries = len(type_data[type_data['runs_off_bat'].isin([4,6])])
+                dots = len(type_data[type_data['runs_off_bat'] == 0])
+                sr = (runs / balls) * 100 if balls > 0 else 0
+                avg = runs / dismissals if dismissals > 0 else runs
+                dismissals_per_100 = (dismissals / balls) * 100 if balls > 0 else 0
+                runs_per_ball = runs / balls if balls > 0 else 0
                 
-                type_stats[batter_type] = {
-                    'runs': int(runs),
-                    'balls': int(balls),
-                    'overs': round(overs, 1),
-                    'wickets': wickets,
-                    'economy': round(economy, 2),
-                    'average': round(avg, 2)
-                }
-            else:
-                type_stats[batter_type] = {'runs': 0, 'balls': 0, 'overs': 0, 'wickets': 0, 'economy': 0, 'average': 0}
-        
-        # Determine which batter type is more effective against
-        if type_stats['Right Hand Bat']['economy'] > 0 and type_stats['Left Hand Bat']['economy'] > 0:
-            better_against = 'Left Hand Bat' if type_stats['Right Hand Bat']['economy'] < type_stats['Left Hand Bat']['economy'] else 'Right Hand Bat'
-        elif type_stats['Right Hand Bat']['economy'] > 0:
-            better_against = 'Right Hand Bat'
-        elif type_stats['Left Hand Bat']['economy'] > 0:
-            better_against = 'Left Hand Bat'
-        else:
-            better_against = 'N/A'
-        
-        return type_stats, better_against
-    
-    def calculate_head_to_head(self, bowler_name, n=5):
-        """Calculate head-to-head statistics against batters"""
-        bowler_balls = self.bowling_data[self.bowling_data['bowler'] == bowler_name]
-        
-        batter_stats = {}
-        for batter in bowler_balls['striker'].unique():
-            batter_data = bowler_balls[bowler_balls['striker'] == batter]
-            if len(batter_data) >= 6:  # Minimum 1 over threshold
-                runs = batter_data['runs_off_bat'].sum()
-                balls = len(batter_data)
-                dismissals = batter_data['wicket_type'].notna().sum()
-                economy = (runs / (balls / 6)) if balls > 0 else 0
-                
-                batter_stats[batter] = {
+                type_stats[bowl_type] = {
                     'runs': int(runs),
                     'balls': int(balls),
                     'dismissals': dismissals,
-                    'economy': round(economy, 2)
+                    'sr': round(sr, 2),
+                    'avg': round(avg, 2),
+                    'vulnerability_score': round(dismissals_per_100, 2),
+                    'boundaries': boundaries,
+                    'dots': dots,
+                    'boundary_pct': round((boundaries / balls) * 100, 2) if balls > 0 else 0,
+                    'dot_pct': round((dots / balls) * 100, 2) if balls > 0 else 0,
+                    'runs_per_ball': round(runs_per_ball, 2)
                 }
         
-        # Sort by balls faced and get top n
-        sorted_batters = sorted(batter_stats.items(), key=lambda x: x[1]['balls'], reverse=True)[:n]
+        # Find best, worst, and rankings based on strike rate (only consider types with balls > 10)
+        valid_types = {k: v for k, v in type_stats.items() if v['balls'] > 10}
         
-        # Find most dominated batter (dismissed at least once, lowest runs per ball)
-        dominated = None
-        dominated_metric = float('inf')
-        for batter, stats in batter_stats.items():
-            if stats['dismissals'] > 0:
-                runs_per_ball = stats['runs'] / stats['balls']
-                if runs_per_ball < dominated_metric:
-                    dominated_metric = runs_per_ball
-                    dominated = batter
+        if valid_types:
+            # Sort by strike rate (higher is better for batter)
+            sorted_by_sr = sorted(valid_types.items(), key=lambda x: x[1]['sr'], reverse=True)
+            
+            best_against = sorted_by_sr[0][0] if sorted_by_sr else 'N/A'
+            worst_against = sorted_by_sr[-1][0] if sorted_by_sr else 'N/A'
+            most_vulnerable = max(valid_types.items(), key=lambda x: x[1]['vulnerability_score'])[0]
+            
+            # Second best and second worst
+            second_best = sorted_by_sr[1][0] if len(sorted_by_sr) > 1 else 'N/A'
+            second_worst = sorted_by_sr[-2][0] if len(sorted_by_sr) > 1 else 'N/A'
+            
+            # Calculate overall vulnerability index (weighted average of vulnerability scores)
+            total_balls = sum(v['balls'] for v in valid_types.values())
+            vulnerability_index = sum(v['vulnerability_score'] * v['balls'] for v in valid_types.values()) / total_balls if total_balls > 0 else 0
+            
+            # Calculate performance consistency (standard deviation of strike rates)
+            sr_values = [v['sr'] for v in valid_types.values()]
+            consistency_score = 100 - (np.std(sr_values) * 2) if len(sr_values) > 1 else 50
+            consistency_score = max(0, min(100, consistency_score))
+            
+            return {
+                'best_against': best_against,
+                'best_stats': valid_types[best_against],
+                'second_best': second_best,
+                'second_best_stats': valid_types[second_best] if second_best != 'N/A' else None,
+                'worst_against': worst_against,
+                'worst_stats': valid_types[worst_against],
+                'second_worst': second_worst,
+                'second_worst_stats': valid_types[second_worst] if second_worst != 'N/A' else None,
+                'most_vulnerable': most_vulnerable,
+                'all_stats': type_stats,
+                'vulnerability_index': round(vulnerability_index, 2),
+                'consistency_score': round(consistency_score, 2),
+                'sorted_by_sr': sorted_by_sr
+            }
         
-        # Find most difficult batter (highest runs per ball, min 12 balls)
-        difficult = None
-        difficult_metric = 0
-        for batter, stats in batter_stats.items():
-            if stats['balls'] >= 12:
-                runs_per_ball = stats['runs'] / stats['balls']
-                if runs_per_ball > difficult_metric:
-                    difficult_metric = runs_per_ball
-                    difficult = batter
-        
-        return sorted_batters, dominated, difficult
-    
-    def classify_bowler_style_and_role(self, stats, phase_stats):
-        """
-        Enhanced classification for bowlers based on phase performance and metrics
-        Returns: (bowler_type, primary_phase, specialty, key_metric, role)
-        """
-        economy = stats['economy']
-        strike_rate = stats['strike_rate']
-        dot_pct = stats['dot_percentage']
-        
-        # Get phase economies
-        powerplay_econ = phase_stats.get('Powerplay (1-6)', {}).get('economy', 0)
-        middle_econ = phase_stats.get('Middle (7-15)', {}).get('economy', 0)
-        death_econ = phase_stats.get('Death (16-20)', {}).get('economy', 0)
-        
-        # Determine primary phase based on best economy
-        phase_econs = {
-            'Powerplay': powerplay_econ,
-            'Middle Overs': middle_econ,
-            'Death Overs': death_econ
+        return {
+            'best_against': 'N/A',
+            'worst_against': 'N/A',
+            'most_vulnerable': 'N/A',
+            'all_stats': type_stats,
+            'vulnerability_index': 0,
+            'consistency_score': 0
         }
-        # Filter out zero values
-        phase_econs = {k: v for k, v in phase_econs.items() if v > 0}
-        primary_phase = min(phase_econs, key=phase_econs.get) if phase_econs else "Unknown"
+    
+    def classify_batter_style_and_role(self, stats, phase_stats, best_phase):
+        """
+        Enhanced classification based on WHERE the player scores most runs (best phase)
+        A player is a "Death Over Specialist" if they score most of their runs in death overs
         
-        # Determine specialty
-        specialties = []
-        if powerplay_econ < 7.0 and powerplay_econ > 0:
-            specialties.append("Powerplay Specialist")
-        if death_econ < 8.5 and death_econ > 0:
-            specialties.append("Death Overs Specialist")
-        if strike_rate < 20:
-            specialties.append("Strike Bowler")
-        if economy < 7.5:
-            specialties.append("Economy Bowler")
-        if dot_pct > 45:
-            specialties.append("Containment Specialist")
+        Returns: (batter_type, primary_phase, target_bowlers, key_metric, role)
+        """
+        sr = stats['strike_rate']
+        boundary_pct = stats['boundary_pct']
+        dot_pct = stats['dot_pct']
         
-        specialty = ", ".join(specialties) if specialties else "Developing Bowler"
+        # Get phase stats
+        powerplay_runs = phase_stats.get('Powerplay (1-6)', {}).get('runs', 0)
+        middle_runs = phase_stats.get('Middle (7-15)', {}).get('runs', 0)
+        death_runs = phase_stats.get('Death (16-20)', {}).get('runs', 0)
         
-        # Determine key metric
-        if primary_phase == "Powerplay":
-            key_metric = f"Powerplay Economy: {powerplay_econ:.2f}"
-        elif primary_phase == "Middle Overs":
-            key_metric = f"Middle Overs Economy: {middle_econ:.2f}"
-        else:
-            key_metric = f"Death Overs Economy: {death_econ:.2f}"
+        powerplay_sr = phase_stats.get('Powerplay (1-6)', {}).get('sr', 0)
+        middle_sr = phase_stats.get('Middle (7-15)', {}).get('sr', 0)
+        death_sr = phase_stats.get('Death (16-20)', {}).get('sr', 0)
         
-        # Classify bowler type
-        if death_econ < 8.0 and strike_rate < 18:
-            bowler_type = "Elite Death Bowler"
-            role = "Death Over Specialist"
-        elif strike_rate < 18:
-            bowler_type = "Wicket-Taking Bowler"
-            role = "Strike Bowler"
-        elif economy < 7.2:
-            bowler_type = "Economy Bowler"
-            role = "Containment Specialist"
-        elif powerplay_econ < 6.5:
-            bowler_type = "Powerplay Enforcer"
-            role = "New Ball Bowler"
-        elif death_econ < 9.0:
-            bowler_type = "Death Bowler"
+        total_runs = powerplay_runs + middle_runs + death_runs
+        
+        # Calculate percentage of runs in each phase
+        powerplay_pct = (powerplay_runs / total_runs * 100) if total_runs > 0 else 0
+        middle_pct = (middle_runs / total_runs * 100) if total_runs > 0 else 0
+        death_pct = (death_runs / total_runs * 100) if total_runs > 0 else 0        
+        # Determine primary phase based on where most runs are scored
+        primary_phase = best_phase if best_phase != "N/A" else "Unknown"
+        
+        # Determine target bowlers based on phase performance
+        target_bowlers = []
+        if powerplay_pct > 35 and powerplay_sr > 130:
+            target_bowlers.append("Pace Bowlers")
+        if middle_pct > 35 and middle_sr > 125:
+            target_bowlers.append("Spin Bowlers")
+        if death_pct > 35 and death_sr > 140:
+            target_bowlers.append("Death Bowlers")
+        
+        target_bowlers_str = ", ".join(target_bowlers) if target_bowlers else "All Types"
+        
+        # Determine key metric based on primary phase
+        if primary_phase == "Powerplay (1-6)":
+            key_metric = f"Powerplay Runs: {powerplay_runs} ({powerplay_pct:.1f}%) | SR: {powerplay_sr:.1f}"
+        elif primary_phase == "Middle (7-15)":
+            key_metric = f"Middle Runs: {middle_runs} ({middle_pct:.1f}%) | SR vs Spin: {middle_sr:.1f}"
+        else:  # Death (16-20)
+            key_metric = f"Death Runs: {death_runs} ({death_pct:.1f}%) | Death SR: {death_sr:.1f}"
+        
+        # Classify batter type based on PRIMARY PHASE (where most runs are scored)
+        if primary_phase == "Death (16-20)":
+            batter_type = "Death Over Specialist"
             role = "Finisher"
+        elif primary_phase == "Powerplay (1-6)":
+            batter_type = "Powerplay Specialist"
+            role = "Opener"
+        elif primary_phase == "Middle (7-15)":
+            if middle_sr > 130:
+                batter_type = "Spin Dominator"
+                role = "Middle Order Batter"
+            else:
+                batter_type = "Anchor"
+                role = "Middle Order Batter"
         else:
-            bowler_type = "Support Bowler"
-            role = "Medium Pacer/Spinner"
+            # Fallback based on strike rate
+            if sr > 140:
+                batter_type = "Aggressive Batter"
+                role = "All-round Batter"
+            elif sr > 130:
+                batter_type = "Accumulator"
+                role = "Top/Middle Order"
+            else:
+                batter_type = "Defensive Batter"
+                role = "Lower Order"
         
-        return bowler_type, primary_phase, specialty, key_metric, role
+        return batter_type, primary_phase, target_bowlers_str, key_metric, role
     
     def prepare_features_for_ml(self):
-        """Prepare features for ML clustering of bowlers"""
-        all_bowlers = self.bowling_data['bowler'].unique()
+        """Prepare features for ML clustering"""
+        all_players = self.batting_data['striker'].unique()
         features_list = []
-        bowler_names = []
+        player_names = []
         
-        for bowler in all_bowlers:
-            stats = self.get_bowler_stats(bowler)
-            if stats and stats['balls'] > 100:  # Minimum balls threshold for meaningful clustering
-                phase_stats, _ = self.calculate_best_bowling_phase(bowler)
+        for player in all_players:
+            stats = self.get_player_stats(player)
+            if stats and stats['balls_faced'] > 50:  # Minimum balls threshold for meaningful clustering
+                phase_stats, _ = self.calculate_best_batting_phase(player)
                 
                 features = {
-                    'economy': stats['economy'],
-                    'average': stats['average'],
                     'strike_rate': stats['strike_rate'],
-                    'dot_pct': stats['dot_percentage'],
-                    'powerplay_econ': phase_stats.get('Powerplay (1-6)', {}).get('economy', 0),
-                    'middle_econ': phase_stats.get('Middle (7-15)', {}).get('economy', 0),
-                    'death_econ': phase_stats.get('Death (16-20)', {}).get('economy', 0)
+                    'average': stats['average'],
+                    'boundary_pct': stats['boundary_pct'],
+                    'dot_pct': stats['dot_pct'],
+                    'powerplay_sr': phase_stats.get('Powerplay (1-6)', {}).get('sr', 0),
+                    'middle_sr': phase_stats.get('Middle (7-15)', {}).get('sr', 0),
+                    'death_sr': phase_stats.get('Death (16-20)', {}).get('sr', 0),
+                    'powerplay_runs': phase_stats.get('Powerplay (1-6)', {}).get('runs', 0),
+                    'middle_runs': phase_stats.get('Middle (7-15)', {}).get('runs', 0),
+                    'death_runs': phase_stats.get('Death (16-20)', {}).get('runs', 0)
                 }
                 features_list.append(features)
-                bowler_names.append(bowler)
+                player_names.append(player)
                 
-        return pd.DataFrame(features_list, index=bowler_names)
+        return pd.DataFrame(features_list, index=player_names)
     
     def perform_kmeans_clustering(self, n_clusters=5):
-        """Perform K-means clustering on bowlers"""
+        """Perform K-means clustering on players"""
         features_df = self.prepare_features_for_ml()
         
         if len(features_df) < n_clusters:
@@ -684,47 +737,48 @@ class BowlerAnalyticsSystem:
         kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
         clusters = kmeans.fit_predict(features_scaled)
         
-        # Intelligent cluster naming based on bowling characteristics
+        # Improved cluster naming based on actual characteristics
         cluster_names = {}
         cluster_info = {}
         
         for i in range(n_clusters):
             cluster_data = features_df[clusters == i]
-            avg_economy = cluster_data['economy'].mean()
-            avg_strike_rate = cluster_data['strike_rate'].mean()
-            avg_dot_pct = cluster_data['dot_pct'].mean()
-            avg_death_econ = cluster_data['death_econ'].mean()
-            avg_powerplay_econ = cluster_data['powerplay_econ'].mean()
+            avg_sr = cluster_data['strike_rate'].mean()
+            avg_boundary = cluster_data['boundary_pct'].mean()
+            avg_death_sr = cluster_data['death_sr'].mean()
+            avg_powerplay_sr = cluster_data['powerplay_sr'].mean()
+            avg_middle_sr = cluster_data['middle_sr'].mean()
+            avg_death_runs = cluster_data['death_runs'].mean()
+            avg_powerplay_runs = cluster_data['powerplay_runs'].mean()
+            avg_middle_runs = cluster_data['middle_runs'].mean()
             
-            # Intelligent cluster naming based on bowling style
-            if avg_economy < 7.2 and avg_strike_rate < 18:
-                cluster_names[i] = 'Elite Strike Bowlers'
-            elif avg_death_econ < 8.0:
-                cluster_names[i] = 'Death Overs Specialists'
-            elif avg_powerplay_econ < 6.8 and avg_powerplay_econ > 0:
-                cluster_names[i] = 'Powerplay Enforcers'
-            elif avg_economy < 7.5:
-                cluster_names[i] = 'Economy Bowlers'
-            elif avg_strike_rate < 20:
-                cluster_names[i] = 'Wicket-Taking Bowlers'
-            elif avg_dot_pct > 40:
-                cluster_names[i] = 'Containment Specialists'
+            # Determine primary phase for the cluster
+            if avg_death_runs > avg_powerplay_runs and avg_death_runs > avg_middle_runs:
+                cluster_names[i] = 'Death Over Specialists'
+            elif avg_powerplay_runs > avg_middle_runs and avg_powerplay_runs > avg_death_runs:
+                cluster_names[i] = 'Powerplay Specialists'
+            elif avg_middle_runs > avg_powerplay_runs and avg_middle_runs > avg_death_runs:
+                cluster_names[i] = 'Middle Order Anchors'
+            elif avg_sr > 140 and avg_boundary > 18:
+                cluster_names[i] = 'Elite Aggressive Batters'
+            elif avg_sr < 120:
+                cluster_names[i] = 'Defensive Anchors'
             else:
-                cluster_names[i] = 'Developing Bowlers'
+                cluster_names[i] = 'Versatile Batters'
             
             cluster_info[i] = {
                 'size': len(cluster_data),
-                'avg_economy': round(avg_economy, 2),
+                'avg_sr': round(avg_sr, 2),
                 'players': features_df.index[clusters == i].tolist()
             }
                 
         return clusters, cluster_names, features_df, cluster_info
     
-    def find_similar_bowlers(self, bowler_name, n_similar=5):
-        """Find similar bowlers using KNN"""
+    def find_similar_players(self, player_name, n_similar=5):
+        """Find similar players using KNN"""
         features_df = self.prepare_features_for_ml()
         
-        if bowler_name not in features_df.index:
+        if player_name not in features_df.index:
             return []
             
         # Standardize features
@@ -732,212 +786,267 @@ class BowlerAnalyticsSystem:
         features_scaled = scaler.fit_transform(features_df)
         
         # Compute cosine similarity
-        player_idx = list(features_df.index).index(bowler_name)
+        player_idx = list(features_df.index).index(player_name)
         similarities = cosine_similarity([features_scaled[player_idx]], features_scaled)[0]
         
         # Get top similar players (excluding self)
         similar_indices = np.argsort(similarities)[::-1][1:n_similar+1]
         
-        similar_bowlers = []
+        similar_players = []
         for idx in similar_indices:
             similarity = similarities[idx] * 100
-            similar_bowlers.append({
+            similar_players.append({
                 'name': features_df.index[idx],
                 'similarity': round(similarity, 2)
             })
             
-        return similar_bowlers
+        return similar_players
     
-    def find_bowler_fuzzy(self, input_name):
-        """Fuzzy match bowler name and provide suggestions"""
-        all_bowlers = list(self.bowling_data['bowler'].unique())
+    def find_player_fuzzy(self, input_name):
+        """Fuzzy match player name and provide suggestions - FIXED VERSION"""
+        # Get all players from batting_data (strikers)
+        all_players = list(self.batting_data['striker'].unique())
+        
+        # Also add bowlers from the data
+        all_bowlers = list(self.ball_data['bowler'].unique()) if hasattr(self, 'ball_data') else []
+        all_players = list(set(all_players + all_bowlers))
+        
+        # Also add all players from player_info_map
+        all_players = list(set(all_players + list(self.player_info_map.keys())))
+        
+        # Clean up None values
+        all_players = [p for p in all_players if p and pd.notna(p)]
         
         # Exact match (case-insensitive)
-        for bowler in all_bowlers:
-            if input_name.lower() == bowler.lower():
-                return bowler, None
+        for player in all_players:
+            if input_name.lower() == player.lower():
+                return player, None
         
         # Fuzzy matching using get_close_matches
-        matches = get_close_matches(input_name, all_bowlers, n=5, cutoff=0.4)
+        matches = get_close_matches(input_name, all_players, n=5, cutoff=0.3)
         
         if matches:
-            print(f"\nBowler '{input_name}' not found. Showing similar names:")
+            print(f"\nPlayer '{input_name}' not found. Showing similar names:")
             for i, match in enumerate(matches[:5], 1):
-                print(f"  {i}. {match}")
+                # Try to get additional info if available
+                info = self.player_info_map.get(match, {})
+                role = info.get('role', '')
+                bat = info.get('bat', '')
+                display_name = f"{match}"
+                if role and role != 'Unknown':
+                    display_name += f" ({role})"
+                elif bat and bat != 'Unknown':
+                    display_name += f" ({bat})"
+                print(f"  {i}. {display_name}")
             return None, matches
         
         return None, []
     
-    def generate_visualizations(self, bowler_name):
+    def generate_visualizations(self, player_name):
         """Generate all visualizations using Plotly for interactivity"""
         print("\nGenerating interactive dashboard...")
         
-        stats = self.get_bowler_stats(bowler_name)
+        stats = self.get_player_stats(player_name)
         if not stats:
-            print(f"Cannot generate visualizations: No data for {bowler_name}")
+            print(f"Cannot generate visualizations: No data for {player_name}")
             return
             
-        phase_stats, best_phase = self.calculate_best_bowling_phase(bowler_name)
-        pitch_intel = self.calculate_pitch_intelligence(bowler_name)
-        batter_vuln, better_against = self.calculate_batter_type_vulnerability(bowler_name)
-        head_to_head, dominated, difficult = self.calculate_head_to_head(bowler_name)
-        similar_bowlers = self.find_similar_bowlers(bowler_name)
+        phase_stats, best_phase = self.calculate_best_batting_phase(player_name)
+        pitch_intel = self.calculate_pitch_intelligence(player_name)
+        vulnerability = self.calculate_vulnerability_index(player_name)
+        similar_players = self.find_similar_players(player_name)
+        
+        # Get runs by phase for highlighting
+        runs_by_phase = [phase_stats[p]['runs'] for p in phase_stats.keys()]
+        max_runs_phase = max(runs_by_phase) if runs_by_phase else 0
         
         # Create subplots
         fig = make_subplots(
             rows=3, cols=3,
-            subplot_titles=('Runs & Wickets by Phase', 'Economy Rate by Phase', 'Best vs Worst Venues',
-                          'Batter Type Performance', 'Wicket Distribution', 'Similar Bowlers',
-                          'Phase-wise Economy Heatmap', 'Performance Metrics', 'Bowling Style Profile'),
+            subplot_titles=('Runs by Phase', 'Strike Rate by Phase', 'Best vs Worst Venues',
+                          'Bowler Type Performance', 'Boundary Distribution', 'Similar Players',
+                          'Phase-wise Performance Heatmap', 'Performance Metrics', 'Style Classification'),
             specs=[[{'type': 'bar'}, {'type': 'bar'}, {'type': 'bar'}],
                    [{'type': 'bar'}, {'type': 'pie'}, {'type': 'table'}],
                    [{'type': 'heatmap'}, {'type': 'scatter'}, {'type': 'scatterpolar'}]]
         )
         
-        # 1. Runs and Wickets by Phase
+        # 1. Runs by Phase - Highlight the best phase (where most runs are scored)
         phases = list(phase_stats.keys())
         runs = [phase_stats[p]['runs'] for p in phases]
-        wickets = [phase_stats[p]['wickets'] for p in phases]
-        
-        fig.add_trace(go.Bar(x=phases, y=runs, name='Runs Conceded', 
-                            marker_color='#ff6b6b', 
+        # Color the best phase in green, others in blue
+        run_colors = ['#00ff88' if r == max(runs) else '#4ecdc4' for r in runs]
+        fig.add_trace(go.Bar(x=phases, y=runs, name='Runs', 
+                            marker_color=run_colors, 
                             text=runs, textposition='auto',
                             hovertemplate='Phase: %{x}<br>Runs: %{y}<extra></extra>'), 
                      row=1, col=1)
         
-        fig.add_trace(go.Bar(x=phases, y=wickets, name='Wickets', 
-                            marker_color='#00ff88',
-                            text=wickets, textposition='auto',
-                            hovertemplate='Phase: %{x}<br>Wickets: %{y}<extra></extra>'), 
-                     row=1, col=1)
+        # Add annotation for best phase
+        best_phase_name = phases[runs.index(max(runs))] if runs else "N/A"
         
-        # 2. Economy Rate by Phase
-        economies = [phase_stats[p]['economy'] for p in phases]
-        colors = ['#00ff88' if econ == min(economies) else '#ff6b6b' for econ in economies]
-        fig.add_trace(go.Bar(x=phases, y=economies, name='Economy Rate', 
+        # 2. Strike Rate by Phase
+        sr_values = [phase_stats[p]['sr'] for p in phases]
+        colors = ['#00ff88' if sr == max(sr_values) else '#ff6b6b' for sr in sr_values]
+        fig.add_trace(go.Bar(x=phases, y=sr_values, name='Strike Rate', 
                             marker_color=colors,
-                            text=[f"{econ:.2f}" for econ in economies], textposition='auto',
-                            hovertemplate='Phase: %{x}<br>Economy: %{y:.2f}<extra></extra>'), 
+                            text=[f"{sr:.1f}" for sr in sr_values], textposition='auto',
+                            hovertemplate='Phase: %{x}<br>Strike Rate: %{y:.1f}<extra></extra>'), 
                      row=1, col=2)
         
-        # 3. Pitch Performance - Best and Worst Venues
+        # 3. Pitch Performance - Top 3 Best and Top 3 Worst Venues
         if pitch_intel:
             best_venues_names = [v[0] for v in pitch_intel['best_venues']]
-            best_venues_econ = [v[1]['economy'] for v in pitch_intel['best_venues']]
+            best_venues_sr = [v[1]['sr'] for v in pitch_intel['best_venues']]
             worst_venues_names = [v[0] for v in pitch_intel['worst_venues']]
-            worst_venues_econ = [v[1]['economy'] for v in pitch_intel['worst_venues']]
+            worst_venues_sr = [v[1]['sr'] for v in pitch_intel['worst_venues']]
             
             # Add best venues (green)
-            fig.add_trace(go.Bar(x=best_venues_names, y=best_venues_econ, 
+            fig.add_trace(go.Bar(x=best_venues_names, y=best_venues_sr, 
                                 marker_color='#00ff88',
                                 name='Best Venues',
-                                text=[f"Econ: {econ:.2f}" for econ in best_venues_econ], 
+                                text=[f"SR: {sr:.1f}" for sr in best_venues_sr], 
                                 textposition='auto',
-                                hovertemplate='Venue: %{x}<br>Economy: %{y:.2f}<extra></extra>'), 
+                                textfont=dict(size=10),
+                                hovertemplate='Venue: %{x}<br>SR: %{y:.1f}<br>Balls: %{customdata}<extra></extra>',
+                                customdata=[[v[1]['balls']] for v in pitch_intel['best_venues']]), 
                          row=1, col=3)
             
             # Add worst venues (red)
-            fig.add_trace(go.Bar(x=worst_venues_names, y=worst_venues_econ, 
+            fig.add_trace(go.Bar(x=worst_venues_names, y=worst_venues_sr, 
                                 marker_color='#ff6b6b',
                                 name='Worst Venues',
-                                text=[f"Econ: {econ:.2f}" for econ in worst_venues_econ], 
+                                text=[f"SR: {sr:.1f}" for sr in worst_venues_sr], 
                                 textposition='auto',
-                                hovertemplate='Venue: %{x}<br>Economy: %{y:.2f}<extra></extra>'), 
+                                textfont=dict(size=10),
+                                hovertemplate='Venue: %{x}<br>SR: %{y:.1f}<br>Balls: %{customdata}<extra></extra>',
+                                customdata=[[v[1]['balls']] for v in pitch_intel['worst_venues']]), 
                          row=1, col=3)
         
-        # 4. Batter Type Performance
-        batter_types = list(batter_vuln.keys())
-        batter_economies = [batter_vuln[t]['economy'] for t in batter_types]
-        batter_wickets = [batter_vuln[t]['wickets'] for t in batter_types]
+        # 4. Bowler Type Performance - Show ALL 4 types with detailed metrics
+        if vulnerability and vulnerability['all_stats']:
+            bowler_types = list(vulnerability['all_stats'].keys())
+            bowler_sr = [vulnerability['all_stats'][t]['sr'] for t in bowler_types]
+            bowler_avg = [vulnerability['all_stats'][t]['avg'] for t in bowler_types]
+            bowler_balls = [vulnerability['all_stats'][t]['balls'] for t in bowler_types]
+            bowler_boundary_pct = [vulnerability['all_stats'][t]['boundary_pct'] for t in bowler_types]
+            bowler_dot_pct = [vulnerability['all_stats'][t]['dot_pct'] for t in bowler_types]
+            
+            # Color code based on ranking
+            colors_bowler = []
+            if vulnerability.get('sorted_by_sr'):
+                sorted_types = [t for t, _ in vulnerability['sorted_by_sr']]
+                for t in bowler_types:
+                    if t == sorted_types[0] if sorted_types else None:
+                        colors_bowler.append('#00ff88')  # Best - Green
+                    elif t == sorted_types[-1] if sorted_types else None:
+                        colors_bowler.append('#ff6b6b')  # Worst - Red
+                    elif len(sorted_types) > 1 and t == sorted_types[1]:
+                        colors_bowler.append('#90EE90')  # Second Best - Light Green
+                    elif len(sorted_types) > 1 and t == sorted_types[-2]:
+                        colors_bowler.append('#ff9999')  # Second Worst - Light Red
+                    else:
+                        colors_bowler.append('#ffa500')  # Middle - Orange
+            else:
+                colors_bowler = ['#ffa500'] * len(bowler_types)
+            
+            # Create detailed display text
+            display_text = []
+            for i, t in enumerate(bowler_types):
+                if bowler_balls[i] > 0:
+                    display_text.append(
+                        f"SR: {bowler_sr[i]:.1f}\n"
+                        f"({bowler_balls[i]} balls)\n"
+                        f"Boundary%: {bowler_boundary_pct[i]:.1f}%\n"
+                        f"Dot%: {bowler_dot_pct[i]:.1f}%"
+                    )
+                else:
+                    display_text.append("No Data")
+            
+            fig.add_trace(go.Bar(x=bowler_types, y=bowler_sr, 
+                                marker_color=colors_bowler,
+                                text=display_text,
+                                textposition='outside',
+                                textfont=dict(size=10, color='white'),
+                                hovertemplate='<b>%{x}</b><br>' +
+                                              'Strike Rate: %{y:.1f}<br>' +
+                                              'Average: %{customdata[0]:.2f}<br>' +
+                                              'Balls Faced: %{customdata[1]}<br>' +
+                                              'Boundary %: %{customdata[2]:.1f}%<br>' +
+                                              'Dot %: %{customdata[3]:.1f}%<br>' +
+                                              '<extra></extra>',
+                                customdata=[[avg, balls, bp, dp] for avg, balls, bp, dp 
+                                          in zip(bowler_avg, bowler_balls, bowler_boundary_pct, bowler_dot_pct)]), 
+                         row=2, col=1)
+            
+            # Add horizontal line for league average if available
+            league_avg_sr = np.mean([v for v in bowler_sr if v > 0])
+            if league_avg_sr > 0:
+                fig.add_hline(y=league_avg_sr, line_dash="dash", line_color="white",
+                             annotation_text=f"League Avg: {league_avg_sr:.1f}",
+                             annotation_position="top right", row=2, col=1)
         
-        # Color code: better against in green
-        colors_batter = ['#00ff88' if t == better_against else '#ffa500' for t in batter_types]
+        # 5. Boundary Distribution
+        player_balls = self.batting_data[self.batting_data['striker'] == player_name]
+        fours = len(player_balls[player_balls['runs_off_bat'] == 4])
+        sixes = len(player_balls[player_balls['runs_off_bat'] == 6])
+        ones_twos_threes = len(player_balls[player_balls['runs_off_bat'].isin([1,2,3])])
+        zeros = len(player_balls[player_balls['runs_off_bat'] == 0])
         
-        fig.add_trace(go.Bar(x=batter_types, y=batter_economies, 
-                            marker_color=colors_batter,
-                            name='Economy vs Batter Type',
-                            text=[f"Econ: {econ:.2f}" for econ in batter_economies],
-                            textposition='outside',
-                            hovertemplate='Batter Type: %{x}<br>Economy: %{y:.2f}<br>Wickets: %{customdata}<extra></extra>',
-                            customdata=batter_wickets), 
-                     row=2, col=1)
+        fig.add_trace(go.Pie(labels=['Fours', 'Sixes', '1s/2s/3s', 'Dots'], 
+                            values=[fours, sixes, ones_twos_threes, zeros], 
+                            name='Boundaries',
+                            marker=dict(colors=['#00ff88', '#ff6b6b', '#ffa500', '#888888']),
+                            textinfo='percent+label',
+                            hole=0.3,
+                            hovertemplate='%{label}: %{value} balls (%{percent})<extra></extra>'), 
+                     row=2, col=2)
         
-        # 5. Wicket Distribution (how wickets were taken)
-        bowler_data = self.bowling_data[self.bowling_data['bowler'] == bowler_name]
-        wicket_data = bowler_data[bowler_data['wicket_type'].notna()]
-        
-        if len(wicket_data) > 0:
-            wicket_types = wicket_data['wicket_type'].value_counts()
-            fig.add_trace(go.Pie(labels=wicket_types.index, 
-                                values=wicket_types.values, 
-                                name='Wicket Types',
-                                marker=dict(colors=['#00ff88', '#ff6b6b', '#ffa500', '#888888', '#4ecdc4']),
-                                textinfo='percent+label',
-                                hole=0.3,
-                                hovertemplate='%{label}: %{value} wickets (%{percent})<extra></extra>'), 
-                         row=2, col=2)
-        
-        # 6. Similar Bowlers Table
-        if similar_bowlers:
-            table_data = [[p['name'], f"{p['similarity']:.1f}%"] for p in similar_bowlers[:5]]
+        # 6. Similar Players Table
+        if similar_players:
+            table_data = [[p['name'], f"{p['similarity']:.1f}%"] for p in similar_players[:5]]
             fig.add_trace(go.Table(
-                header=dict(values=['Bowler', 'Similarity'], 
+                header=dict(values=['Player', 'Similarity'], 
                           fill_color='#2e2e2e', 
                           align='left',
                           font=dict(color='white', size=12)),
-                cells=dict(values=[list(zip(*table_data))[0] if table_data else [], 
-                                  list(zip(*table_data))[1] if table_data else []], 
+                cells=dict(values=[list(zip(*table_data))[0], list(zip(*table_data))[1]], 
                           fill_color='#1e1e1e',
                           align='left',
                           font=dict(color='white', size=11))
             ), row=2, col=3)
         
-        # 7. Performance Heatmap (Economy by Phase and Overs)
-        # Create overs bins
-        bowler_data['over_bin'] = pd.cut(bowler_data['over'], bins=[0, 6, 11, 16, 21], labels=['1-6', '7-11', '12-16', '17-20'])
-        heatmap_data = bowler_data.groupby(['over_bin', 'ball_number'])['runs_off_bat'].mean().unstack().fillna(0)
-        
-        fig.add_trace(go.Heatmap(z=heatmap_data.values, 
-                                x=[f"Ball {i}" for i in heatmap_data.columns],
-                                y=heatmap_data.index,
-                                colorscale='RdYlGn_r',
-                                zmid=0,
-                                text=heatmap_data.values.round(1),
+        # 7. Phase-wise Performance Heatmap (Runs and SR combined)
+        heatmap_data = np.array([[runs[0], sr_values[0]], [runs[1], sr_values[1]], [runs[2], sr_values[2]]])
+        fig.add_trace(go.Heatmap(z=heatmap_data, 
+                                x=['Runs', 'Strike Rate'], 
+                                y=phases,
+                                colorscale='Viridis',
+                                text=heatmap_data.round(1),
                                 texttemplate='%{text}',
-                                hovertemplate='Over Range: %{y}<br>Ball: %{x}<br>Avg Runs: %{z:.1f}<extra></extra>'), 
+                                hovertemplate='Phase: %{y}<br>Metric: %{x}<br>Value: %{z}<extra></extra>'), 
                      row=3, col=1)
         
         # 8. Performance Metrics Scatter
-        performance_metrics = ['Economy', 'Average', 'Strike Rate', 'Dot %', 'Boundary %']
-        metric_values = [stats['economy'], stats['average'], stats['strike_rate'], 
-                        stats['dot_percentage'], stats['boundary_percentage']]
-        
-        # Normalize for better visualization (except economy which is better when lower)
-        normalized_values = []
-        for i, val in enumerate(metric_values):
-            if i == 0:  # Economy - lower is better
-                normalized_values.append(max(0, min(100, (12 - val) * 20)))
-            else:
-                normalized_values.append(min(100, val))
-        
-        fig.add_trace(go.Scatter(x=performance_metrics, y=normalized_values, 
+        performance_metrics = ['Average', 'Strike Rate', 'Boundary%', 'Dot%']
+        metric_values = [stats['average'], stats['strike_rate'], stats['boundary_pct'], stats['dot_pct']]
+        fig.add_trace(go.Scatter(x=performance_metrics, y=metric_values, 
                                 mode='lines+markers',
                                 name='Performance',
                                 line=dict(color='#00ff88', width=3),
                                 marker=dict(size=15, color='#ff6b6b'),
                                 text=[f"{val:.1f}" for val in metric_values],
                                 textposition='top center',
-                                hovertemplate='Metric: %{x}<br>Original Value: %{customdata}<extra></extra>',
-                                customdata=metric_values), 
+                                hovertemplate='Metric: %{x}<br>Value: %{y:.1f}<extra></extra>'), 
                      row=3, col=2)
         
-        # 9. Bowling Style Radar Chart
+        # 9. Style Classification Radar
         style_scores = {
-            'Economy': max(0, min(100, (1 - (stats['economy'] - 7) / 5) * 100)),
-            'Wicket Taking': min(100, (15 / stats['strike_rate']) * 100 if stats['strike_rate'] > 0 else 0),
-            'Dot Balls': min(100, stats['dot_percentage'] * 2),
-            'Death Bowling': min(100, (1 - (phase_stats.get('Death (16-20)', {}).get('economy', 9) - 8) / 5) * 100),
-            'Powerplay': min(100, (1 - (phase_stats.get('Powerplay (1-6)', {}).get('economy', 8) - 6) / 6) * 100)
+            'Powerplay\nRuns %': min(100, (phase_stats.get('Powerplay (1-6)', {}).get('runs', 0) / stats['runs'] * 100) if stats['runs'] > 0 else 0),
+            'Middle\nRuns %': min(100, (phase_stats.get('Middle (7-15)', {}).get('runs', 0) / stats['runs'] * 100) if stats['runs'] > 0 else 0),
+            'Death\nRuns %': min(100, (phase_stats.get('Death (16-20)', {}).get('runs', 0) / stats['runs'] * 100) if stats['runs'] > 0 else 0),
+            'Boundary\n%': min(100, stats['boundary_pct'] * 2),
+            'Strike\nRate': min(100, stats['strike_rate'] / 1.6)
         }
         
         fig.add_trace(go.Scatterpolar(r=list(style_scores.values()), 
@@ -952,7 +1061,7 @@ class BowlerAnalyticsSystem:
         # Update layout
         fig.update_layout(
             title=dict(
-                text=f'<b>{bowler_name} - Complete Bowling Analytics Dashboard</b>',
+                text=f'<b>{player_name} - Complete Analytics Dashboard</b><br><sup>Best Phase: {best_phase_name} (Most Runs: {max(runs)} runs)</sup>',
                 x=0.5,
                 font=dict(size=24, color='white')
             ),
@@ -967,69 +1076,91 @@ class BowlerAnalyticsSystem:
         
         # Update axes labels
         fig.update_xaxes(title_text="Phase", row=1, col=1, color='white')
-        fig.update_yaxes(title_text="Count", row=1, col=1, color='white')
+        fig.update_yaxes(title_text="Runs", row=1, col=1, color='white')
         fig.update_xaxes(title_text="Phase", row=1, col=2, color='white')
-        fig.update_yaxes(title_text="Economy Rate", row=1, col=2, color='white')
+        fig.update_yaxes(title_text="Strike Rate", row=1, col=2, color='white')
         fig.update_xaxes(title_text="Venue", row=1, col=3, color='white')
-        fig.update_yaxes(title_text="Economy Rate", row=1, col=3, color='white')
-        fig.update_xaxes(title_text="Batter Type", row=2, col=1, color='white')
-        fig.update_yaxes(title_text="Economy Rate", row=2, col=1, color='white')
+        fig.update_yaxes(title_text="Strike Rate", row=1, col=3, color='white')
+        fig.update_xaxes(title_text="Bowler Type", row=2, col=1, color='white')
+        fig.update_yaxes(title_text="Strike Rate", row=2, col=1, color='white')
+        
+        # Update y-axis range for bowler type chart to ensure visibility
+        if vulnerability and vulnerability['all_stats']:
+            max_sr = max([v['sr'] for v in vulnerability['all_stats'].values()])
+            if max_sr > 0:
+                fig.update_yaxes(range=[0, max_sr * 1.3], row=2, col=1)
         
         # Update polar layout for radar chart
         fig.update_polars(radialaxis=dict(visible=True, range=[0, 100]), row=3, col=3)
         
         # Save and open
-        filename = f"{bowler_name.replace(' ', '_')}_bowler_dashboard.html"
+        filename = f"{player_name.replace(' ', '_')}_dashboard.html"
         fig.write_html(filename)
         webbrowser.open(filename)
         print(f"✓ Interactive dashboard saved as {filename}")
         
-    def generate_complete_report(self, bowler_name):
-        """Generate complete analytics report for the bowler"""
+    def generate_complete_report(self, player_name):
+        """Generate complete analytics report for the player"""
         print(f"\n{'='*70}")
-        print(f"BOWLER ANALYTICS REPORT".center(70))
+        print(f"PLAYER ANALYTICS REPORT".center(70))
         print(f"{'='*70}\n")
         
         # Get all analytics
-        stats = self.get_bowler_stats(bowler_name)
+        stats = self.get_player_stats(player_name)
         if not stats:
-            print(f"No data found for bowler: {bowler_name}")
+            print(f"No data found for player: {player_name}")
             return None
             
-        phase_stats, best_phase = self.calculate_best_bowling_phase(bowler_name)
-        dominance_scores = self.calculate_phase_dominance_score(bowler_name)
-        pitch_intel = self.calculate_pitch_intelligence(bowler_name)
-        batter_vuln, better_against = self.calculate_batter_type_vulnerability(bowler_name)
-        head_to_head, dominated, difficult = self.calculate_head_to_head(bowler_name)
+        phase_stats, best_phase = self.calculate_best_batting_phase(player_name)
+        dominance_scores = self.calculate_phase_dominance_score(player_name)
+        pitch_intel = self.calculate_pitch_intelligence(player_name)
+        vulnerability = self.calculate_vulnerability_index(player_name)
         
-        # Enhanced classification
-        bowler_type, primary_phase, specialty, key_metric, role = self.classify_bowler_style_and_role(stats, phase_stats)
+        # Get runs by phase
+        powerplay_runs = phase_stats.get('Powerplay (1-6)', {}).get('runs', 0)
+        middle_runs = phase_stats.get('Middle (7-15)', {}).get('runs', 0)
+        death_runs = phase_stats.get('Death (16-20)', {}).get('runs', 0)
+        total_runs = stats['runs']
+        
+        # Calculate percentages
+        powerplay_pct = (powerplay_runs / total_runs * 100) if total_runs > 0 else 0
+        middle_pct = (middle_runs / total_runs * 100) if total_runs > 0 else 0
+        death_pct = (death_runs / total_runs * 100) if total_runs > 0 else 0
+        
+        # Enhanced classification with phase-based logic
+        batter_type, primary_phase, target_bowlers, key_metric, role = self.classify_batter_style_and_role(stats, phase_stats, best_phase)
         
         # Display Profile
-        print("BOWLER PROFILE".center(70))
+        print("PLAYER PROFILE".center(70))
         print(f"{'-'*70}")
-        print(f"Bowler Name     : {stats['name']}")
+        print(f"Player Name     : {stats['name']}")
+        print(f"Batting Style   : {stats['bat_style']}")
         print(f"Bowling Style   : {stats['bowl_style']}")
-        print(f"Bowler Type     : {stats['bowler_type']}")
+        print(f"Batter Subtype  : {stats.get('batter_subtype', 'Standard')}")
         print(f"Matches         : {stats['matches']}")
         print(f"Innings         : {stats['innings']}")
-        print(f"Overs Bowled    : {stats['overs']}")
-        print(f"Balls Bowled    : {stats['balls']}")
-        print(f"Runs Conceded   : {stats['runs']}")
-        print(f"Wickets         : {stats['wickets']}")
-        print(f"Economy         : {stats['economy']}")
+        print(f"Runs            : {stats['runs']}")
+        print(f"Balls Faced     : {stats['balls_faced']}")
         print(f"Average         : {stats['average']}")
         print(f"Strike Rate     : {stats['strike_rate']}")
-        print(f"Dot Ball %      : {stats['dot_percentage']}%")
-        print(f"Boundary %      : {stats['boundary_percentage']}%")
-        print(f"4/5 Wkts Hauls  : {stats['four_wicket_hauls']}/{stats['five_wicket_hauls']}")
+        print(f"Boundary %      : {stats['boundary_pct']}%")
+        print(f"Dot Ball %      : {stats['dot_pct']}%")
+        print(f"50s/100s        : {stats['fifties']}/{stats['hundreds']}")
         
-        print(f"\n{'BEST BOWLING PHASE'.center(70)}")
+        print(f"\n{'RUNS DISTRIBUTION BY PHASE'.center(70)}")
+        print(f"{'-'*70}")
+        print(f"Powerplay (1-6) : {powerplay_runs} runs ({powerplay_pct:.1f}%) | SR: {phase_stats.get('Powerplay (1-6)', {}).get('sr', 0):.1f}")
+        print(f"Middle (7-15)   : {middle_runs} runs ({middle_pct:.1f}%) | SR: {phase_stats.get('Middle (7-15)', {}).get('sr', 0):.1f}")
+        print(f"Death (16-20)   : {death_runs} runs ({death_pct:.1f}%) | SR: {phase_stats.get('Death (16-20)', {}).get('sr', 0):.1f}")
+        
+        print(f"\n{'BEST BATTING PHASE'.center(70)}")
         print(f"{'-'*70}")
         for phase, pstats in phase_stats.items():
-            if pstats['overs'] > 0:
-                print(f"{phase:20} Econ: {pstats['economy']:.2f} | Wkts: {pstats['wickets']} | Overs: {pstats['overs']} | Dot%: {pstats['dot_pct']:.1f}%")
-        print(f"\n⭐ Best Phase      : {best_phase}")
+            if pstats['runs'] > 0:
+                print(f"{phase:20} Runs: {pstats['runs']:5} | SR: {pstats['sr']:.1f} | Avg: {pstats['avg']:.2f} | Balls: {pstats['balls']} | Boundaries: {pstats.get('boundaries', 0)}")
+        
+        print(f"\n⭐ BEST PHASE      : {best_phase}")
+        print(f"   (Most runs scored in this phase)")
         
         print(f"\n{'PHASE DOMINANCE SCORE'.center(70)}")
         print(f"{'-'*70}")
@@ -1041,139 +1172,152 @@ class BowlerAnalyticsSystem:
         if pitch_intel:
             print(f"\n{'PITCH INTELLIGENCE'.center(70)}")
             print(f"{'-'*70}")
-            print(f"🏟️ Top 2 Best Venues :")
+            print(f"🏟️ TOP 3 BEST VENUES:")
             for venue, stats_data in pitch_intel['best_venues']:
-                print(f"   • {venue}: Econ: {stats_data['economy']:.2f}, Wkts: {stats_data['wickets']} (Overs: {stats_data['overs']})")
-            print(f"🏟️ Top 2 Worst Venues:")
+                print(f"   • {venue[:45]:45} SR: {stats_data['sr']:.1f} | Avg: {stats_data['avg']:.2f} | Runs: {stats_data['runs']} | Balls: {stats_data['balls']}")
+            
+            print(f"\n🏟️ TOP 3 WORST VENUES:")
             for venue, stats_data in pitch_intel['worst_venues']:
-                print(f"   • {venue}: Econ: {stats_data['economy']:.2f}, Wkts: {stats_data['wickets']} (Overs: {stats_data['overs']})")
-            print(f"📊 Pitch Score     : {pitch_intel['pitch_score']:.1f}/100")
-            print(f"📈 Avg Economy     : {pitch_intel['avg_economy']:.2f}")
+                print(f"   • {venue[:45]:45} SR: {stats_data['sr']:.1f} | Avg: {stats_data['avg']:.2f} | Runs: {stats_data['runs']} | Balls: {stats_data['balls']}")
+            
+            print(f"\n📊 Pitch Score     : {pitch_intel['pitch_score']:.1f}/100")
+            print(f"📈 Avg SR across venues: {pitch_intel['avg_sr']:.1f}")
+            print(f"📍 Total venues played: {pitch_intel['total_venues']}")
         
-        print(f"\n{'BATTER TYPE EFFECTIVENESS'.center(70)}")
+        if vulnerability:
+            print(f"\n{'VULNERABILITY INDEX'.center(70)}")
+            print(f"{'-'*70}")
+            
+            # Display all 4 bowler types with detailed stats - IMPROVED FORMATTING
+            print(f"📊 DETAILED BREAKDOWN BY BOWLER TYPE:")
+            print(f"   {'Bowler Type':<20} {'SR':<8} {'Avg':<8} {'Balls':<8} {'Boundary%':<12} {'Dot%':<10} {'Dismissals':<10}")
+            print(f"   {'-'*80}")
+            
+            for bowl_type, data in vulnerability['all_stats'].items():
+                if data['balls'] > 0:
+                    print(f"   {bowl_type:<20} {data['sr']:<8.1f} {data['avg']:<8.2f} {data['balls']:<8} {data['boundary_pct']:<11.1f}% {data['dot_pct']:<9.1f}% {data['dismissals']:<10}")
+                else:
+                    print(f"   {bowl_type:<20} {'N/A':<8} {'N/A':<8} {data['balls']:<8} {'N/A':<12} {'N/A':<10} {data['dismissals']:<10}")
+            
+            print(f"\n🎯 RANKINGS:")
+            if vulnerability.get('sorted_by_sr'):
+                for rank, (bowl_type, data) in enumerate(vulnerability['sorted_by_sr'], 1):
+                    print(f"   #{rank}: {bowl_type} (SR: {data['sr']:.1f})")
+            
+            print(f"\n✅ BEST AGAINST    : {vulnerability['best_against']}")
+            if vulnerability['best_against'] != 'N/A':
+                best_data = vulnerability['best_stats']
+                print(f"   - SR: {best_data['sr']:.1f} | Avg: {best_data['avg']:.2f} | Balls: {best_data['balls']} | Boundary%: {best_data['boundary_pct']:.1f}%")
+            
+            if vulnerability.get('second_best') and vulnerability['second_best'] != 'N/A':
+                print(f"🥈 SECOND BEST     : {vulnerability['second_best']}")
+                if vulnerability['second_best_stats']:
+                    sb_data = vulnerability['second_best_stats']
+                    print(f"   - SR: {sb_data['sr']:.1f} | Avg: {sb_data['avg']:.2f} | Balls: {sb_data['balls']}")
+            
+            print(f"\n❌ WORST AGAINST   : {vulnerability['worst_against']}")
+            if vulnerability['worst_against'] != 'N/A':
+                worst_data = vulnerability['worst_stats']
+                print(f"   - SR: {worst_data['sr']:.1f} | Avg: {worst_data['avg']:.2f} | Balls: {worst_data['balls']} | Boundary%: {worst_data['boundary_pct']:.1f}%")
+            
+            if vulnerability.get('second_worst') and vulnerability['second_worst'] != 'N/A':
+                print(f"🥈 SECOND WORST    : {vulnerability['second_worst']}")
+                if vulnerability['second_worst_stats']:
+                    sw_data = vulnerability['second_worst_stats']
+                    print(f"   - SR: {sw_data['sr']:.1f} | Avg: {sw_data['avg']:.2f} | Balls: {sw_data['balls']}")
+            
+            print(f"\n⚠️ MOST VULNERABLE : {vulnerability['most_vulnerable']} (Highest dismissal rate)")
+            if vulnerability['most_vulnerable'] != 'N/A':
+                vul_data = vulnerability['all_stats'].get(vulnerability['most_vulnerable'], {})
+                print(f"   - Dismissals/100 balls: {vul_data.get('vulnerability_score', 0):.2f}")
+            
+            print(f"\n📊 OVERALL VULNERABILITY INDEX: {vulnerability.get('vulnerability_index', 0):.1f}/100")
+            print(f"   (Higher score = More vulnerable against these bowler types)")
+            print(f"🎯 CONSISTENCY SCORE: {vulnerability.get('consistency_score', 0):.1f}/100")
+            print(f"   (Higher score = More consistent performance across bowler types)")
+        
+        print(f"\n{'BATTER CLASSIFICATION'.center(70)}")
         print(f"{'-'*70}")
-        for batter_type, data in batter_vuln.items():
-            if data['overs'] > 0:
-                print(f"{batter_type:20} Econ: {data['economy']:.2f} | Avg: {data['average']:.2f} | Wkts: {data['wickets']} | Overs: {data['overs']}")
-        print(f"\n✅ Most Effective Against: {better_against}")
-        
-        print(f"\n{'HEAD-TO-HEAD ANALYSIS'.center(70)}")
-        print(f"{'-'*70}")
-        print(f"Top 5 Batters Faced:")
-        for batter, data in head_to_head:
-            print(f"   • {batter[:20]:20} Runs: {data['runs']:4} | Balls: {data['balls']:4} | Dismissals: {data['dismissals']} | Econ: {data['economy']:.2f}")
-        
-        if dominated:
-            print(f"\n✅ Most Dominated Batter: {dominated}")
-        if difficult:
-            print(f"⚠️ Most Difficult Batter: {difficult}")
-        
-        print(f"\n{'BOWLER CLASSIFICATION'.center(70)}")
-        print(f"{'-'*70}")
-        print(f"🎯 Bowler Type     : {bowler_type}")
+        print(f"🎯 Batter Type     : {batter_type}")
         print(f"📍 Primary Phase   : {primary_phase}")
-        print(f"🎯 Specialty       : {specialty}")
+        print(f"🎯 Target Bowlers  : {target_bowlers}")
         print(f"📊 Key Metric      : {key_metric}")
         print(f"🏏 Role            : {role}")
-        
-        # Calculate and display Impact Score
-        impact_score = self.calculate_impact_score(stats, phase_stats)
-        print(f"\n{'IMPACT SCORE'.center(70)}")
-        print(f"{'-'*70}")
-        print(f"📊 Overall Impact Score: {impact_score:.1f}/100")
-        
-        if impact_score >= 85:
-            print(f"🏆 Rating: ELITE - Among the best in the league")
-        elif impact_score >= 70:
-            print(f"🏆 Rating: EXCELLENT - Very effective bowler")
-        elif impact_score >= 55:
-            print(f"🏆 Rating: GOOD - Solid performer")
-        elif impact_score >= 40:
-            print(f"🏆 Rating: AVERAGE - Needs improvement")
-        else:
-            print(f"🏆 Rating: DEVELOPING - Has potential")
         
         # ML Clustering
         try:
             clusters, cluster_names, features_df, cluster_info = self.perform_kmeans_clustering()
-            bowler_cluster = None
+            player_cluster = None
             cluster_id = None
-            for idx, bowler in enumerate(features_df.index):
-                if bowler == bowler_name and idx < len(clusters):
-                    bowler_cluster = cluster_names[clusters[idx]]
+            for idx, player in enumerate(features_df.index):
+                if player == player_name and idx < len(clusters):
+                    player_cluster = cluster_names[clusters[idx]]
                     cluster_id = clusters[idx]
                     break
             
-            if bowler_cluster and cluster_id is not None:
+            if player_cluster and cluster_id is not None:
                 print(f"\n{'MACHINE LEARNING - CLUSTER'.center(70)}")
                 print(f"{'-'*70}")
-                print(f"📊 Cluster Name   : {bowler_cluster}")
-                print(f"👥 Bowlers in cluster: {cluster_info[cluster_id]['size']}")
-                print(f"📈 Cluster Avg Econ: {cluster_info[cluster_id]['avg_economy']}")
+                print(f"📊 Cluster Name   : {player_cluster}")
+                print(f"👥 Players in cluster: {cluster_info[cluster_id]['size']}")
+                print(f"📈 Cluster Avg SR : {cluster_info[cluster_id]['avg_sr']}")
         except Exception as e:
             print(f"\nClustering not available: {e}")
         
-        # Similar Bowlers
-        similar = self.find_similar_bowlers(bowler_name)
+        # Similar Players
+        similar = self.find_similar_players(player_name)
         if similar:
-            print(f"\n{'SIMILAR BOWLERS (KNN)'.center(70)}")
+            print(f"\n{'SIMILAR PLAYERS (KNN)'.center(70)}")
             print(f"{'-'*70}")
-            for i, bowler in enumerate(similar[:5], 1):
-                print(f"{i}. {bowler['name']}    ({bowler['similarity']:.1f}% similar)")
+            for i, player in enumerate(similar[:5], 1):
+                print(f"{i}. {player['name']}    ({player['similarity']:.1f}% similar)")
         
         print(f"\n{'='*70}")
         print(f"END OF REPORT".center(70))
         print(f"{'='*70}\n")
         
         # Generate visualizations
-        self.generate_visualizations(bowler_name)
+        self.generate_visualizations(player_name)
         
         return stats
-    
-    def calculate_impact_score(self, stats, phase_stats):
-        """Calculate overall bowling impact score (0-100)"""
-        # Economy score (lower economy is better)
-        economy_score = max(0, min(100, (1 - (stats['economy'] - 6) / 6) * 100))
-        
-        # Wicket score (more wickets per match is better)
-        wickets_per_match = stats['wickets'] / stats['matches']
-        wicket_score = min(100, (wickets_per_match / 2) * 100)
-        
-        # Strike rate score (lower strike rate is better)
-        sr_score = max(0, min(100, (1 - (stats['strike_rate'] - 15) / 25) * 100))
-        
-        # Dot ball score
-        dot_score = min(100, (stats['dot_percentage'] / 50) * 100)
-        
-        # Phase performance score
-        death_econ = phase_stats.get('Death (16-20)', {}).get('economy', 10)
-        death_score = max(0, min(100, (1 - (death_econ - 8) / 6) * 100))
-        
-        # Weighted average
-        impact = (economy_score * 0.3) + (wicket_score * 0.3) + (sr_score * 0.2) + (dot_score * 0.1) + (death_score * 0.1)
-        return round(impact, 2)
 
+# Batter subtype map for additional categorization
+CricketAnalyticsSystem.batter_subtype_map = {
+    'V Kohli': 'Top Order Anchor', 'Virat Kohli': 'Top Order Anchor',
+    'RG Sharma': 'Powerplay Hitter', 'Rohit Sharma': 'Powerplay Hitter',
+    'KL Rahul': 'Top Order Accumulator', 'MS Dhoni': 'Finisher',
+    'SA Yadav': 'Spin Hitter', 'Suryakumar Yadav': 'Spin Hitter',
+    'JC Buttler': 'Powerplay Hitter', 'Jos Buttler': 'Powerplay Hitter',
+    'AB de Villiers': 'Finisher', 'RR Pant': 'Aggressive Middle Order',
+    'Ishan Kishan': 'Powerplay Hitter', 'Shubman Gill': 'Top Order Anchor',
+    'DA Warner': 'Powerplay Hitter', 'David Warner': 'Powerplay Hitter',
+    'G Gambhir': 'Top Order Anchor', 'Gautam Gambhir': 'Top Order Anchor',
+    'SC Ganguly': 'Top Order Anchor', 'R Dravid': 'Top Order Anchor',
+    'V Sehwag': 'Powerplay Hitter', 'BB McCullum': 'Powerplay Hitter',
+    'ML Hayden': 'Powerplay Hitter', 'AC Gilchrist': 'Powerplay Hitter',
+    'CH Gayle': 'Powerplay Hitter', 'KP Pietersen': 'Aggressive Batter'
+}
 
 def main():
-    """Main function to run the Bowler Analytics System"""
+    """Main function to run the Cricket Analytics System"""
     print("="*70)
-    print("IPL BOWLER ANALYTICS SYSTEM".center(70))
+    print("IPL CRICKET PLAYER ANALYTICS SYSTEM".center(70))
     print("Senior Sports Data Scientist & Python Developer".center(70))
     print("="*70)
     
     # Initialize system
-    analytics = BowlerAnalyticsSystem()
+    analytics = CricketAnalyticsSystem()
     
-    # Get bowler name
+    # Get player name
     while True:
-        bowler_name = input("\n📝 Enter Bowler Name: ").strip().title()
+        player_name = input("\n📝 Enter Player Name (e.g., 'V Kohli', 'MS Dhoni', 'AB de Villiers'): ").strip()
         
-        if not bowler_name:
-            print("Please enter a valid bowler name.")
+        if not player_name:
+            print("Please enter a valid player name.")
             continue
             
-        # Find bowler
-        exact_match, suggestions = analytics.find_bowler_fuzzy(bowler_name)
+        # Find player
+        exact_match, suggestions = analytics.find_player_fuzzy(player_name)
         
         if exact_match:
             # Generate report
@@ -1183,7 +1327,7 @@ def main():
             # Ask for selection from suggestions
             while True:
                 try:
-                    choice = input("\nSelect bowler number (or 'q' to quit): ")
+                    choice = input("\nSelect player number (or 'q' to quit): ")
                     if choice.lower() == 'q':
                         print("Exiting system. Goodbye!")
                         return
@@ -1196,7 +1340,7 @@ def main():
                 except ValueError:
                     print("Please enter a valid number.")
         else:
-            print("No similar bowlers found. Please try another name.")
+            print("No similar players found. Please try another name.")
             
     print("\n✅ Analysis complete! Check the generated HTML dashboard in your browser.\n")
 
